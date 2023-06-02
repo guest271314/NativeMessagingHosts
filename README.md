@@ -21,9 +21,9 @@ Tested echoing `new Array(209715)` (1 MB) from client to host.
 
 > Chrome starts each native messaging host in a separate process and communicates with it using standard input (`stdin`) and standard output (`stdout`). The same format is used to send messages in both directions; each message is serialized using JSON, UTF-8 encoded and is preceded with 32-bit message length in native byte order. The maximum size of a single message from the native messaging host is 1 MB, mainly to protect Chrome from misbehaving native applications. The maximum size of the message sent to the native messaging host is 4 GB.
 
-# Usage
+# Installation and usage
 
-(https://github.com/guest271314/native-messaging-quickjs/edit/main/README.md)
+From [`native-messaging-quickjs`](https://github.com/guest271314/native-messaging-quickjs/edit/main/README.md).
 
 # Examples
 
