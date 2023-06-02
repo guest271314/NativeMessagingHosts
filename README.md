@@ -29,7 +29,7 @@ From [`native-messaging-quickjs`](https://github.com/guest271314/native-messagin
 
 - Capture system and specific audio output, stream output to browser. [capture_system_audio](https://github.com/guest271314/captureSystemAudio/tree/master/native_messaging/capture_system_audio)
 - Send text or SSML to local eSpeak NG speech syntehsis engine, stream output to browser [native-messaging-espeak-ng](https://github.com/guest271314/native-messaging-espeak-ng)
-- Turn local PHP server on and off from browser [native-messaging-php](https://github.com/guest271314/native-messaging-php), see also `deno-server` branch in `native-messaging-espeak-ng`
+- Turn local PHP server on and off from browser [native-messaging-php](https://github.com/guest271314/native-messaging-php), see also [`deno-server`](https://github.com/guest271314/native-messaging-espeak-ng/tree/deno-server) branch in `native-messaging-espeak-ng`
 - WAT embedded in a Bash shell script [nm_c_wat.sh](https://github.com/guest271314/native-messaging-webassembly/blob/main/nm_c_wat.sh) (see usage note at [10.](https://github.com/guest271314/native-messaging-webassembly#readme:~:text=for%20WAT%20embedded%20in%20nm_c_wat.sh%20we%20use%20kill_wasmtime.sh%20to%20terminate%20wasmtime%20using%20polling%20of%20nm_c_wat.sh%20because%20process%20substitution%20keeps%20wasmtime%20running%20after%20the%20Native%20Messaging%20host%20is%20disconnected%20and%20exits.))
 
 # W.I.P.
