@@ -8,7 +8,7 @@
 - Node.js
 - Deno
 - Bun
-- WebAssembly (WAT, WASM compiled with WASI SDK)
+- WebAssembly (`nm_c.c` compiled to WASM with WASI SDK, WAT compiled with `wasm2wat`)
 
 Tested echoing `new Array(209715)` (1 MB) from client to host. 
 
