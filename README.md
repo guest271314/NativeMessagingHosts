@@ -23,7 +23,7 @@ Tested echoing `new Array(209715)` (1 MB) from client to host.
 
 # Installation and usage
 
-From [`native-messaging-quickjs`](https://github.com/guest271314/native-messaging-quickjs/edit/main/README.md).
+From [`native-messaging-quickjs`](https://github.com/guest271314/native-messaging-quickjs#readme).
 
 # Examples
 
