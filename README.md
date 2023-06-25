@@ -11,7 +11,7 @@
 - WebAssembly (`nm_c.c` compiled to WASM with WASI SDK, WAT compiled with `wasm2wat`)
 - Bash
 
-- Tested echoing `new Array(209715)` (1 MB in JSON format) from client to host. 
+Tested echoing `new Array(209715)` (1 MB in JSON format) from client to host. 
 
 # Native messaging documentation
 - [Chrome Developers](https://developer.chrome.com/docs/extensions/mv3/nativeMessaging/)
@@ -34,7 +34,7 @@ Installation and usage on Chrome and Chromium
 6. Open, for example, `nm_c_wasm.json` in a text editor, set `"path"` to absolute path of `nm_c.wasm` and `chrome-extension://<ID>/` using ID from 5 in `"allowed_origins"` array. 
 7. Copy the `nm_c_wasm.json` file to Chrome or Chromium configuration folder, e.g., Chromium on \*nix `~/.config/chromium/NativeMessagingHosts`; Chrome dev channel on \*nix `~/.config/google-chrome-unstable/NativeMessagingHosts`.
 8. Make sure `wasmtime`, or the single host file, e.g. when using QuickJS, `nm_qjs.js` are executable.
-9. To test click `service worker` link in panel of unpacked extension which is DevTools for `background.js` in MV3 `ServiceWorker`, observe echo'ed message from Native Messaging host. To disconnect run `port.disconnect()`.
+9. To test click `service worker` link in panel of unpacked extension which is DevTools for `background.js` in MV3 `ServiceWorker`, observe echo'ed message from Native Messaging host to client in  DevTools `console`. To disconnect run `port.disconnect()`.
 
 For differences between OS and browser implementations see [Chrome incompatibilities](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Chrome_incompatibilities#native_messaging). For Firefox or Nightly usage see also [Can't get response in Ubuntu #506](https://github.com/mdn/webextensions-examples/issues/506).
 
