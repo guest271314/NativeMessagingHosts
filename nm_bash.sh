@@ -1,6 +1,5 @@
 #!/bin/bash
 # Bash Native Messaging host
-# guest271314 6-24-2023
 set -x
 set -o posix
 getMessage() {
