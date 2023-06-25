@@ -2,10 +2,13 @@
 # Bash Native Messaging host
 # guest271314 6-24-2023
 set -x
-#!/bin/bash
+set -o posix
 getMessage() {
-  length=$(head -q -z --bytes=4 -| od -An -td4 -)
-  message=$(head -q -z --bytes=$((length)) -)
+  # https://lists.gnu.org/archive/html/help-bash/2023-06/msg00036.html
+  # length=$(head -q -z --bytes=4 -| od -An -td4 -)
+  # message=$(head -q -z --bytes=$((length)) -)
+  length=$(busybox dd iflag=fullblock bs=4 count=1 | busybox od -An -td4)
+  message=$(busybox dd iflag=fullblock bs=$((length)) count=1)
   sendMessage "$message"
 }
 # https://stackoverflow.com/a/24777120
