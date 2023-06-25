@@ -8,8 +8,8 @@
 - Node.js
 - Deno
 - Bun
-- WebAssembly (`nm_c.c` compiled to WASM with WASI SDK, WAT compiled with `wasm2wat`)
-- Bash (GNU Core Utilities `head`; or Busybox `dd`, `od`)
+- WebAssembly/WASI
+- Bash
 
 Tested echoing `new Array(209715)` (1 MB in JSON format) from client to host. 
 
