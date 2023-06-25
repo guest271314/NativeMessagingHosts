@@ -24,7 +24,21 @@ Tested echoing `new Array(209715)` (1 MB) from client to host.
 
 # Installation and usage
 
-From [`native-messaging-quickjs`](https://github.com/guest271314/native-messaging-quickjs#readme).
+Installation and usage on Chrome and Chromium
+
+1. Navigate to `chrome://extensions`.
+2. Toggle `Developer mode`.
+3. Click `Load unpacked`.
+4. Select native-messaging-quickjs folder.
+5. Note the generated extension ID.
+6. Open, for example, `nm_c_wasm.json` in a text editor, set `"path"` to absolute path of `nm_c.wasm` and `chrome-extension://<ID>/` using ID from 5 in `"allowed_origins"` array. 
+7. Copy the `nm_c_wasm.json` file to Chrome or Chromium configuration folder, e.g., Chromium on \*nix `~/.config/chromium/NativeMessagingHosts`; Chrome dev channel on \*nix `~/.config/google-chrome-unstable/NativeMessagingHosts`.
+8. Make sure `wasmtime`, or the single host file, e.g. when using QuickJS, `nm_qjs.js` are executable.
+9. To test click `service worker` link in panel of unpacked extension which is DevTools for `background.js` in MV3 `ServiceWorker`, observe echo'ed message from txiki.js Native Messaging host. To disconnect run `port.disconnect()`.
+
+The Native Messaging host echoes back the message passed. Tested with `new Array(208715)` (1 MB JSON) input.
+
+For differences between OS and browser implementations see [Chrome incompatibilities](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Chrome_incompatibilities#native_messaging). For Firefox or Nightly usage see also [Can't get response in Ubuntu #506](https://github.com/mdn/webextensions-examples/issues/506).
 
 # Examples
 
