@@ -4,10 +4,10 @@ set -x
 set -o posix
 getMessage() {
   # https://lists.gnu.org/archive/html/help-bash/2023-06/msg00036.html
-  # length=$(head -q -z --bytes=4 -| od -An -td4 -)
-  # message=$(head -q -z --bytes=$((length)) -)
-  length=$(busybox dd iflag=fullblock bs=4 count=1 | busybox od -An -td4)
-  message=$(busybox dd iflag=fullblock bs=$((length)) count=1)
+  # length=$(busybox dd iflag=fullblock bs=4 count=1 | busybox od -An -td4)
+  # message=$(busybox dd iflag=fullblock bs=$((length)) count=1)
+  length=$(head -q -z --bytes=4 -| od -An -td4 -)
+  message=$(head -q -z --bytes=$((length)) -)
   sendMessage "$message"
 }
 # https://stackoverflow.com/a/24777120
