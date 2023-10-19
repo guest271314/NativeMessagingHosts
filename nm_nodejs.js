@@ -1,4 +1,4 @@
-#!/usr/bin/env -S ./node --jitless --expose-gc --v8-pool-size=1
+#!/usr/bin/env -S node --expose-gc --experimental-default-type=module
 // Node.js Native Messaging host
 // guest271314, 10-9-2022
 import { open } from "node:fs/promises";
