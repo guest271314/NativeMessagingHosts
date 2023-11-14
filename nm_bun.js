@@ -1,22 +1,32 @@
 #!/usr/bin/env -S ./bun run --no-install --hot
 // Bun Native Messaging host
 // guest271314, 10-9-2022
-import {readSync} from 'node:fs';
+async function getMessage() {
+  const { promise, resolve } = Promise.withResolvers();
+  // https://github.com/simov/native-messaging/blob/8e99d2a345ae94426a502d05aa5d57b966f6bc78/protocol.js
+  let messageLength = 0,
+    bytesWritten = 0,
+    input = [];
 
-function readFullSync(fd, buf) {
-  let offset = 0;
-  while (offset < buf.byteLength) {
-    offset += readSync(fd, buf, { offset });
-  }
-  return buf;
-}
+  process.stdin.on("readable", () => {
+    let chunk;
+    while ((chunk = process.stdin.read())) {
+      // Set message value length once
+      if (messageLength === 0) {
+        [messageLength] = new Uint32Array(chunk.buffer.slice(0, 4));
+        chunk = chunk.subarray(4);
+      }
+      // Store accrued message length read
+      bytesWritten += chunk.length;
+      input.push(...chunk);
+      if (bytesWritten === messageLength) {
+        // Send accrued message from client back to client
+        resolve(new Uint8Array(input));
+      }
+    }
+  });
 
-function getMessage() {
-  const header = new Uint32Array(1);
-  readFullSync(0, header);
-  const content = new Uint8Array(header[0]);
-  readFullSync(0, content);
-  return content;
+  return await promise;
 }
 
 function sendMessage(json) {
@@ -42,10 +52,10 @@ function sendMessage(json) {
   Bun.gc(true);
 }
 
-function main() {
+async function main() {
   while (true) {
     try {
-      const message = getMessage();
+      const message = await getMessage();
       sendMessage(message);
     } catch (e) {
       process.exit();
