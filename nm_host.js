@@ -5,6 +5,15 @@
 */
 
 const runtime = navigator.userAgent;
+const buffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 });
+const view = new DataView(buffer);
+const encoder = new TextEncoder();
+const importMeta = Object.assign(
+  {},
+  ...["file", "filename", "dir", "dirname", "path", "url", "main"].map((
+    key,
+  ) => ({ [key]: import.meta[key] })),
+);
 
 let readable, writable, exit, args;
 
@@ -33,16 +42,6 @@ if (runtime.startsWith("Bun")) {
   ({ exit } = process);
   ({ argv: args } = Bun);
 }
-
-const buffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 });
-const view = new DataView(buffer);
-const encoder = new TextEncoder();
-const importMeta = Object.assign(
-  {},
-  ...["file", "filename", "dir", "dirname", "path", "url", "main"].map((
-    key,
-  ) => ({ [key]: import.meta[key] })),
-);
 
 function encodeMessage(message) {
   return encoder.encode(JSON.stringify(message));
