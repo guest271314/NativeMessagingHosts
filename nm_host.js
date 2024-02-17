@@ -20,7 +20,7 @@ if (runtime.startsWith("Node")) {
   ({ readable } = Duplex.toWeb(process.stdin));
   ({ writable } = Duplex.toWeb(process.stdout));
   ({ exit } = process);
-  ({ argv: args } = process.argv);
+  ({ argv: args } = process);
 }
 
 if (runtime.startsWith("Bun")) {
