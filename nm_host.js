@@ -37,6 +37,12 @@ if (runtime.startsWith("Bun")) {
 const buffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 });
 const view = new DataView(buffer);
 const encoder = new TextEncoder();
+const importMeta = Object.assign(
+  {},
+  ...["file", "filename", "dir", "dirname", "path", "url", "main"].map((
+    key,
+  ) => ({ [key]: import.meta[key] })),
+);
 
 function encodeMessage(message) {
   return encoder.encode(JSON.stringify(message));
@@ -78,7 +84,7 @@ async function sendMessage(message) {
 }
 
 try {
-  await sendMessage(encodeMessage([import.meta, ...args]));
+  await sendMessage(encodeMessage([importMeta, ...args]));
   for await (const message of getMessage()) {
     await sendMessage(message);
   }
