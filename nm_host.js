@@ -28,7 +28,7 @@ if (runtime.startsWith("Node")) {
 }
 
 if (runtime.startsWith("Bun")) {
-  readable = Bun.stdin.stream();
+  readable = Bun.file("/dev/stdin").stream();
   writable = new WritableStream({
     async write(value) {
       await Bun.write(Bun.stdout, value);
