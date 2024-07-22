@@ -24,7 +24,7 @@ function getMessage(pid) {
   echo "$message"`,
     ])).trim();
     if (stdin != undefined && stdin != null && stdin.length) {
-      const message = encodeMessage(stdin.trim());
+      const message = encodeMessage(stdin);
       // https://stackoverflow.com/a/58288413
       // const header = new Uint32Array([
       //  ((uint32) =>
