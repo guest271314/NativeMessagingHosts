@@ -57,7 +57,7 @@ message=$(dd iflag=fullblock oflag=nocache conv=notrunc,fdatasync bs=$((length))
 printf "$message"
 `,
   ]];
-  const qjs = ["/home/xubuntu/bin/qjs", [
+  const qjs = ["/home/user/bin/qjs", [
     "--std",
     "-m",
     "-e",
