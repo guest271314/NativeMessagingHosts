@@ -12,7 +12,9 @@ async function readFullAsync(length) {
     if (n === null) {
       break;
     }
-    data.push(...buffer.subarray(0, n));
+    for (const value of buffer.subarray(0, n)) {
+      data.push(value);
+    }
   }
   return new Uint8Array(data);
 }
