@@ -52,8 +52,10 @@ function main() {
     "--posix",
     "-c",
     `
-length=$(dd iflag=fullblock oflag=nocache conv=notrunc,fdatasync bs=4 count=1 if=/proc/${pid}/fd/0 | od -An -td4 -)
-message=$(dd iflag=fullblock oflag=nocache conv=notrunc,fdatasync bs=$((length)) count=1 if=/proc/${pid}/fd/0)
+length=$(head -q -z --bytes=4 /proc/${pid}/fd/0 | od -An -td4 -)
+message=$(head -q -z --bytes=$((length)) /proc/${pid}/fd/0)
+# length=$(dd iflag=fullblock oflag=nocache conv=notrunc,fdatasync bs=4 count=1 if=/proc/${pid}/fd/0 | od -An -td4 -)
+# message=$(dd iflag=fullblock oflag=nocache conv=notrunc,fdatasync bs=$((length)) count=1 if=/proc/${pid}/fd/0)
 printf "$message"
 `,
   ]];
