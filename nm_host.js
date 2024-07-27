@@ -78,7 +78,7 @@ async function sendMessage(message) {
 }
 
 try {
-  await sendMessage(encodeMessage([{ dirname, filename, url }, ...args]));
+  await sendMessage(encodeMessage([{ dirname, filename, url }, { cwd }, ...args]));
   for await (const message of getMessage()) {
     await sendMessage(message);
   }
