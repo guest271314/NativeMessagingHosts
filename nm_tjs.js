@@ -5,18 +5,18 @@
 // https://github.com/denoland/deno/discussions/17236#discussioncomment-4566134
 // https://github.com/saghul/txiki.js/blob/master/src/js/core/tjs/eval-stdin.js
 async function readFullAsync(length) {
-  const buffer = new Uint8Array(65535);
-  const data = [];
-  while (data.length < length) {
-    const n = await tjs.stdin.read(buffer);
+  const data = new Uint8Array(65536);
+  const buffer = new Uint8Array(length);
+  let offset = 0; 
+  do {
+    const n = await tjs.stdin.read(data);
     if (n === null) {
       break;
     }
-    for (const value of buffer.subarray(0, n)) {
-      data.push(value);
-    }
-  }
-  return new Uint8Array(data);
+    buffer.set(data.subarray(0, n), offset);
+    offset += n;
+  } while (offset < length);
+  return buffer;
 }
 
 async function getMessage() {
