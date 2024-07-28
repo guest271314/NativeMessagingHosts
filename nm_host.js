@@ -20,9 +20,13 @@ if (runtime.startsWith("Deno")) {
 }
 
 if (runtime.startsWith("Node")) {
-  const { Duplex } = await import("node:stream");
-  ({ readable } = Duplex.toWeb(process.stdin));
-  ({ writable } = Duplex.toWeb(process.stdout));
+  // https://nodejs.org/api/stream.html#consuming-readable-streams-with-async-iterators
+  readable = process.stdin;
+  writable = new WritableStream({
+    write(value) {
+       process.stdout.write(value);
+    }
+  });
   ({ exit } = process);
   ({ argv: args } = process);
 }
