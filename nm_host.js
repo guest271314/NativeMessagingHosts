@@ -83,6 +83,7 @@ try {
     await sendMessage(message);
   }
 } catch (e) {
+  sendMessage(encodeMessage(e.message));
   exit();
 }
 
