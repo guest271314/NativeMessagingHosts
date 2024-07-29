@@ -58,7 +58,6 @@ interface ArrayBufferConstructor {
 
 // Convert JavaScript to TypeScript, no obvious equivalent with tsc
 // https://www.codeconvert.ai/javascript-to-typescript-converter
-// But wait, there's https://www.typescriptlang.org/docs/handbook/declaration-files/dts-from-js.html
 
 const runtime: string = navigator.userAgent;
 const buffer: ArrayBuffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 });
