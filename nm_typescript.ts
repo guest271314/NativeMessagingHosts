@@ -83,7 +83,7 @@ if (runtime.startsWith("Node")) {
     write(value) {
       process.stdout.write(value);
     },
-  }, new CountQueuingStrategy<Uint8Array>({ highWaterMark: Infinity }));
+  }, new CountQueuingStrategy({ highWaterMark: Infinity }));
   ({ exit } = process);
   ({ argv: args } = process);
 }
@@ -94,7 +94,7 @@ if (runtime.startsWith("Bun")) {
     async write(value) {
       await Bun.write(Bun.stdout, value);
     },
-  }, new CountQueuingStrategy<Uint8Array>({ highWaterMark: Infinity }));
+  }, new CountQueuingStrategy({ highWaterMark: Infinity }));
   ({ exit } = process);
   ({ argv: args } = Bun);
 }
