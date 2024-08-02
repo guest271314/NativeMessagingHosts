@@ -107,7 +107,7 @@ async function* getMessage(): AsyncGenerator<Uint8Array> {
   let messageLength: number = 0;
   let readOffset: number = 0;
   for await (let message of readable) {
-    if (buffer.byteLength === 0) {
+    if (buffer.byteLength === 0 && messageLength === 0) {
       buffer.resize(4);
       for (let i = 0; i < 4; i++) {
         view.setUint8(i, message[i]);
