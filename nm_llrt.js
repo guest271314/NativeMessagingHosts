@@ -48,25 +48,7 @@ function sendMessage(json) {
 }
 
 async function main() {
-  const pid = String.fromCodePoint.apply(
-    null,
-    await new Promise((resolve, reject) => {
-      let res = [];
-      const subprocess = spawn("pgrep", ["-n", "-f", filename], {
-        stdio: "pipe",
-      });
-      subprocess.stdout.on("data", (data) => {
-        res.push(...data);
-      });
-      subprocess.stdout.on("close", (code) => {
-        resolve(new Uint8Array(res));
-      });
-      subprocess.stdout.on("exit", (code) => {
-        reject(encodeMessage({ code }));
-      });
-    }).catch((e) => e),
-  ).replace(/\D+/g, "");
-
+  const pid = process.id;
   const bash = ["bash", [
     "--posix",
     "-c",
