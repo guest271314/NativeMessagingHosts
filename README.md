@@ -13,6 +13,7 @@
 - SpiderMonkey `js` shell
 - V8 `d8` shell
 - TypeScript
+- Amazon Web Services - Labs LLRT (Low Latency Runtime)
 
 Tested echoing `new Array(209715)` (1 MB in JSON format) from client to host. 
 
