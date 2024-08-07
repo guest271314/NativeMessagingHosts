@@ -12,7 +12,7 @@
 - Bash
 - SpiderMonkey `js` shell
 - V8 `d8` shell
-- TypeScriptMessaging between the app and JavaScript in a Safari web extension
+- TypeScript
 
 - Amazon Web Services - Labs LLRT (Low Latency Runtime)
 
