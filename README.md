@@ -35,7 +35,7 @@ Installation and usage on Chrome and Chromium
 1. Navigate to `chrome://extensions`.
 2. Toggle `Developer mode`.
 3. Click `Load unpacked`.
-4. Select native-messaging-quickjs folder.
+4. Select `native-messaging-<host>` folder, e.g.,  `native-messaging-webassembly`.
 5. Note the generated extension ID.
 6. Open, for example, `nm_c_wasm.json` in a text editor, set `"path"` to absolute path of `nm_c.wasm` and `chrome-extension://<ID>/` using ID from 5 in `"allowed_origins"` array. 
 7. Copy the `nm_c_wasm.json` file to Chrome or Chromium configuration folder, e.g., Chromium on \*nix `~/.config/chromium/NativeMessagingHosts`; Chrome dev channel on \*nix `~/.config/google-chrome-unstable/NativeMessagingHosts`.
