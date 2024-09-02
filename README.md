@@ -15,6 +15,7 @@
 - TypeScript
 - Amazon Web Services - Labs LLRT (Low Latency Runtime)
 - Rust
+- `tee` command (Busybox; GNU Coreutils)
 
 Tested echoing `new Array(209715)` (1 MB in JSON format) from client to host. 
 
