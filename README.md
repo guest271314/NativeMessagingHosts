@@ -54,7 +54,7 @@ For differences between OS and browser implementations see [Chrome incompatibili
 - Full duplex streaming from and to the browser over HTTP/2 with WHATWG  `fetch()` and Streams ([Deno](https://github.com/guest271314/native-messaging-deno/tree/fetch-duplex) version, [Node.js](https://github.com/guest271314/native-messaging-nodejs/blob/full-duplex/nm_nodejs.mjs) version)
 - `nm_host.js` and `nm_host.ts` can be run by `node`, `deno`, and `bun`
 - `nm_bash_standalone.sh` does not use subshells
-
+- rhasspy/piper local TTS stream [native-messaging-piper](https://github.com/guest271314/native-messaging-piper)
 
 # License
 Do What the Fuck You Want to Public License [WTFPLv2](http://www.wtfpl.net/about/)
