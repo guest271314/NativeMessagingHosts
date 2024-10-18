@@ -1,22 +1,22 @@
 /*
-#!/usr/bin/env -S /home/user/bin/deno run -A /home/user/bin/nm_host.js
-#!/usr/bin/env -S /home/user/bin/node --experimental-default-type=module /home/user/bin/nm_host.js
-#!/usr/bin/env -S /home/user/bin/bun run --smol /home/user/bin/nm_host.js
+#!/usr/bin/env -S /home/user/bin/deno -A /home/user/bin/nm_host.js
+#!/usr/bin/env -S /home/user/bin/node /home/user/bin/nm_host.js
+#!/usr/bin/env -S /home/user/bin/bun run /home/user/bin/nm_host.js
 */
-
+import * as process from "node:process";
 const runtime = navigator.userAgent;
 const buffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 });
 const view = new DataView(buffer);
 const encoder = new TextEncoder();
-const { dirname, filename, url } = import.meta;
+// const { dirname, filename, url } = import.meta;
 
-let readable, writable, exit, args;
+let readable, writable, exit; // args
 
 if (runtime.startsWith("Deno")) {
   ({ readable } = Deno.stdin);
   ({ writable } = Deno.stdout);
   ({ exit } = Deno);
-  ({ args } = Deno);
+  // ({ args } = Deno);
 }
 
 if (runtime.startsWith("Node")) {
@@ -28,7 +28,7 @@ if (runtime.startsWith("Node")) {
     }
   });
   ({ exit } = process);
-  ({ argv: args } = process);
+  // ({ argv: args } = process);
 }
 
 if (runtime.startsWith("Bun")) {
@@ -39,7 +39,7 @@ if (runtime.startsWith("Bun")) {
     },
   }, new CountQueuingStrategy({ highWaterMark: Infinity }));
   ({ exit } = process);
-  ({ argv: args } = Bun);
+  // ({ argv: args } = Bun);
 }
 
 function encodeMessage(message) {
@@ -82,7 +82,7 @@ async function sendMessage(message) {
 }
 
 try {
-  await sendMessage(encodeMessage([{ dirname, filename, url }, ...args]));
+  // await sendMessage(encodeMessage([{ dirname, filename, url }, ...args]));
   for await (const message of getMessage()) {
     await sendMessage(message);
   }
@@ -90,10 +90,8 @@ try {
   sendMessage(encodeMessage(e.message));
   exit();
 }
-
 /*
 export {
-  args,
   encodeMessage,
   exit,
   getMessage,
