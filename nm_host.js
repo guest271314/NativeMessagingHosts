@@ -20,7 +20,6 @@ if (runtime.startsWith("Deno")) {
 }
 
 if (runtime.startsWith("Node")) {
-  // https://nodejs.org/api/stream.html#consuming-readable-streams-with-async-iterators
   readable = process.stdin;
   writable = new WritableStream({
     write(value) {
