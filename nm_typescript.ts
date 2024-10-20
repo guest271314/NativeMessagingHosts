@@ -1,83 +1,33 @@
 // TypeScript Native Messaging host
 // guest271314, 7-28-2024
 /*
-#!/usr/bin/env -S /home/user/bin/deno run
+#!/usr/bin/env -S /home/user/bin/deno -A
 #!/usr/bin/env -S /home/user/bin/bun run 
-#!/usr/bin/env -S /home/user/bin/node --experimental-default-type=module --experimental-strip-types
+#!/usr/bin/env -S /home/user/bin/node --experimental-default-type=module --experimental-transform-types
 */
-  /**
-  * /// <reference types="https://raw.githubusercontent.com/microsoft/TypeScript/eeffd209154b122d4b9d0eaca44526a2784073ae/src/lib/es2024.arraybuffer.d.ts" />
-  */
-interface ArrayBuffer {
-  /**
-   * If this ArrayBuffer is resizable, returns the maximum byte length given during construction; returns the byte length if not.
-   *
-   * [MDN](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/maxByteLength)
-   */
-  get maxByteLength(): number;
 
-  /**
-   * Returns true if this ArrayBuffer can be resized.
-   *
-   * [MDN](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/resizable)
-   */
-  get resizable(): boolean;
-
-  /**
-   * Resizes the ArrayBuffer to the specified size (in bytes).
-   *
-   * [MDN](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/resize)
-   */
-  resize(newByteLength?: number): void;
-
-  /**
-   * Returns a boolean indicating whether or not this buffer has been detached (transferred).
-   *
-   * [MDN](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/detached)
-   */
-  get detached(): boolean;
-
-  /**
-   * Creates a new ArrayBuffer with the same byte content as this buffer, then detaches this buffer.
-   *
-   * [MDN](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/transfer)
-   */
-  transfer(newByteLength?: number): ArrayBuffer;
-
-  /**
-   * Creates a new non-resizable ArrayBuffer with the same byte content as this buffer, then detaches this buffer.
-   *
-   * [MDN](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/transferToFixedLength)
-   */
-  transferToFixedLength(newByteLength?: number): ArrayBuffer;
-}
-
-interface ArrayBufferConstructor {
-  new (byteLength: number, options?: { maxByteLength?: number }): ArrayBuffer;
-}
-
+// Source JavaScript: https://github.com/guest271314/NativeMessagingHosts/blob/main/nm_host.js
 // Convert JavaScript to TypeScript, no obvious equivalent with tsc
 // https://www.codeconvert.ai/javascript-to-typescript-converter
-
 const runtime: string = navigator.userAgent;
+// Resizable ArrayBuffer supported by tsc Version 5.7.0-dev.20241019
 const buffer: ArrayBuffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 });
 const view: DataView = new DataView(buffer);
 const encoder: TextEncoder = new TextEncoder();
-const { dirname, filename, url } = import.meta;
 
-let readable: ReadableStream<Uint8Array>,
+let readable: NodeJS.ReadStream & { fd: 0; } | ReadableStream<Uint8Array>,
   writable: WritableStream<Uint8Array>,
   exit: () => void,
-  args: string[];
+  process: NodeJS.Process;
 
 if (runtime.startsWith("Deno")) {
   ({ readable } = Deno.stdin);
   ({ writable } = Deno.stdout);
   ({ exit } = Deno);
-  ({ args } = Deno);
 }
 
 if (runtime.startsWith("Node")) {
+  process = await import("node:process");
   readable = process.stdin;
   writable = new WritableStream({
     write(value) {
@@ -85,7 +35,6 @@ if (runtime.startsWith("Node")) {
     },
   }, new CountQueuingStrategy({ highWaterMark: Infinity }));
   ({ exit } = process);
-  ({ argv: args } = process);
 }
 
 if (runtime.startsWith("Bun")) {
@@ -96,7 +45,6 @@ if (runtime.startsWith("Bun")) {
     },
   }, new CountQueuingStrategy({ highWaterMark: Infinity }));
   ({ exit } = process);
-  ({ argv: args } = Bun);
 }
 
 function encodeMessage(message: any): Uint8Array {
@@ -107,7 +55,7 @@ async function* getMessage(): AsyncGenerator<Uint8Array> {
   let messageLength: number = 0;
   let readOffset: number = 0;
   for await (let message of readable) {
-    if (buffer.byteLength === 0 && messageLength === 0) {
+    if (buffer.byteLength === 0) {
       buffer.resize(4);
       for (let i = 0; i < 4; i++) {
         view.setUint8(i, message[i]);
@@ -139,16 +87,14 @@ async function sendMessage(message: Uint8Array): Promise<void> {
 }
 
 try {
-  await sendMessage(encodeMessage([{ dirname, filename, url }, ...args]));
   for await (const message of getMessage()) {
     await sendMessage(message);
   }
-} catch (e) {
+} catch (e: any) {
   sendMessage(encodeMessage(e.message));
   exit();
 }
 
-/*
 export {
   args,
   encodeMessage,
@@ -158,4 +104,3 @@ export {
   sendMessage,
   writable,
 };
-*/
