@@ -3,7 +3,7 @@
 /*
 #!/usr/bin/env -S /home/user/bin/deno -A
 #!/usr/bin/env -S /home/user/bin/bun run 
-#!/usr/bin/env -S /home/user/bin/node --experimental-default-type=module --experimental-transform-types
+#!/usr/bin/env -S /home/user/bin/node --experimental-transform-types
 */
 
 // Source JavaScript: https://github.com/guest271314/NativeMessagingHosts/blob/main/nm_host.js
@@ -96,7 +96,6 @@ try {
 }
 
 export {
-  args,
   encodeMessage,
   exit,
   getMessage,
