@@ -3,22 +3,32 @@
 /*
 #!/usr/bin/env -S /home/user/bin/deno -A
 #!/usr/bin/env -S /home/user/bin/bun run 
-#!/usr/bin/env -S /home/user/bin/node --experimental-transform-types
+#!/usr/bin/env -S /home/user/bin/node --experimental-default-type=module --experimental-transform-types
 */
-
+/*.
+declare let readable: NodeJS.ReadStream & {
+    fd: 0;
+} | ReadableStream<Uint8Array>, writable: WritableStream<Uint8Array>, exit: () => void;
+declare function encodeMessage(message: any): Uint8Array;
+declare function getMessage(): AsyncGenerator<Uint8Array>;
+declare function sendMessage(message: Uint8Array): Promise<void>;
+export { encodeMessage, exit, getMessage, readable, sendMessage, writable, };
+*/
 // Source JavaScript: https://github.com/guest271314/NativeMessagingHosts/blob/main/nm_host.js
 // Convert JavaScript to TypeScript, no obvious equivalent with tsc
 // https://www.codeconvert.ai/javascript-to-typescript-converter
 const runtime: string = navigator.userAgent;
 // Resizable ArrayBuffer supported by tsc Version 5.7.0-dev.20241019
+/**
+* /// <reference types="https://raw.githubusercontent.com/microsoft/TypeScript/eeffd209154b122d4b9d0eaca44526a2784073ae/src/lib/es2024.arraybuffer.d.ts" />
+*/
 const buffer: ArrayBuffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 });
 const view: DataView = new DataView(buffer);
 const encoder: TextEncoder = new TextEncoder();
 
 let readable: NodeJS.ReadStream & { fd: 0; } | ReadableStream<Uint8Array>,
   writable: WritableStream<Uint8Array>,
-  exit: () => void,
-  process: NodeJS.Process;
+  exit: () => void;
 
 if (runtime.startsWith("Deno")) {
   ({ readable } = Deno.stdin);
@@ -27,8 +37,7 @@ if (runtime.startsWith("Deno")) {
 }
 
 if (runtime.startsWith("Node")) {
-  process = await import("node:process");
-  readable = process.stdin;
+  readable = (await import("node:process")).stdin;
   writable = new WritableStream({
     write(value) {
       process.stdout.write(value);
