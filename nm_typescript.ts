@@ -1,11 +1,13 @@
-// TypeScript Native Messaging host
-// guest271314, 7-28-2024
 /*
-#!/usr/bin/env -S /home/user/bin/deno -A
-#!/usr/bin/env -S /home/user/bin/bun run 
-#!/usr/bin/env -S /home/user/bin/node --experimental-default-type=module --experimental-transform-types
+  #!/usr/bin/env -S /home/user/deno -A
+  #!/usr/bin/env -S /home/user/bun run
+  #!/usr/bin/env -S /home/user/node --experimental-transform-types
+
+  TypeScript Native Messaging host
+  guest271314, 7-28-2024
 */
-/*.
+
+/*
 declare let readable: NodeJS.ReadStream & {
     fd: 0;
 } | ReadableStream<Uint8Array>, writable: WritableStream<Uint8Array>, exit: () => void;
@@ -14,21 +16,24 @@ declare function getMessage(): AsyncGenerator<Uint8Array>;
 declare function sendMessage(message: Uint8Array): Promise<void>;
 export { encodeMessage, exit, getMessage, readable, sendMessage, writable, };
 */
+
 // Source JavaScript: https://github.com/guest271314/NativeMessagingHosts/blob/main/nm_host.js
+//
 // Convert JavaScript to TypeScript, no obvious equivalent with tsc
 // https://www.codeconvert.ai/javascript-to-typescript-converter
-const runtime: string = navigator.userAgent;
+//
 // Resizable ArrayBuffer supported by tsc Version 5.7.0-dev.20241019
-/**
-* /// <reference types="https://raw.githubusercontent.com/microsoft/TypeScript/eeffd209154b122d4b9d0eaca44526a2784073ae/src/lib/es2024.arraybuffer.d.ts" />
-*/
+/// <reference types="https://raw.githubusercontent.com/microsoft/TypeScript/eeffd209154b122d4b9d0eaca44526a2784073ae/src/lib/es2024.arraybuffer.d.ts" />
+
+import process from "node:process";
+const runtime: string = navigator.userAgent;
 const buffer: ArrayBuffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 });
 const view: DataView = new DataView(buffer);
 const encoder: TextEncoder = new TextEncoder();
 
-let readable: NodeJS.ReadStream & { fd: 0; } | ReadableStream<Uint8Array>,
+let readable: NodeJS.ReadStream & { fd: 0 } | ReadableStream<Uint8Array>,
   writable: WritableStream<Uint8Array>,
-  exit: () => void;
+  exit: () => void = () => {};
 
 if (runtime.startsWith("Deno")) {
   ({ readable } = Deno.stdin);
@@ -37,7 +42,7 @@ if (runtime.startsWith("Deno")) {
 }
 
 if (runtime.startsWith("Node")) {
-  readable = (await import("node:process")).stdin;
+  readable = process.stdin;
   writable = new WritableStream({
     write(value) {
       process.stdout.write(value);
@@ -47,16 +52,21 @@ if (runtime.startsWith("Node")) {
 }
 
 if (runtime.startsWith("Bun")) {
+  // Using both comments at the same time doesn't work for deno lint, deno check
+  // deno-lint-ignore no-undef -- Avoid importing @types/bun just for linting
+  // @ts-ignore
   readable = Bun.file("/dev/stdin").stream();
   writable = new WritableStream<Uint8Array>({
     async write(value) {
+      // deno-lint-ignore no-undef
+      // @ts-ignore
       await Bun.write(Bun.stdout, value);
     },
   }, new CountQueuingStrategy({ highWaterMark: Infinity }));
   ({ exit } = process);
 }
 
-function encodeMessage(message: any): Uint8Array {
+function encodeMessage(message: object): Uint8Array {
   return encoder.encode(JSON.stringify(message));
 }
 
@@ -104,11 +114,4 @@ try {
   exit();
 }
 
-export {
-  encodeMessage,
-  exit,
-  getMessage,
-  readable,
-  sendMessage,
-  writable,
-};
+export { encodeMessage, exit, getMessage, readable, sendMessage, writable };
