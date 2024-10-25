@@ -23,7 +23,9 @@ export { encodeMessage, exit, getMessage, readable, sendMessage, writable, };
 // https://www.codeconvert.ai/javascript-to-typescript-converter
 //
 // Resizable ArrayBuffer supported by tsc Version 5.7.0-dev.20241019
-/// <reference types="https://raw.githubusercontent.com/microsoft/TypeScript/eeffd209154b122d4b9d0eaca44526a2784073ae/src/lib/es2024.arraybuffer.d.ts" />
+/**
+* /// <reference types="https://raw.githubusercontent.com/microsoft/TypeScript/2ac4cb78d6930302eb0a55d07f154a2b0597ae32/src/lib/es2024.arraybuffer.d.ts" />
+*/
 
 import process from "node:process";
 const runtime: string = navigator.userAgent;
@@ -36,8 +38,11 @@ let readable: NodeJS.ReadStream & { fd: 0 } | ReadableStream<Uint8Array>,
   exit: () => void = () => {};
 
 if (runtime.startsWith("Deno")) {
+  // @ts-ignore Deno
   ({ readable } = Deno.stdin);
+  // @ts-ignore Deno
   ({ writable } = Deno.stdout);
+  // @ts-ignore Deno
   ({ exit } = Deno);
 }
 
@@ -52,14 +57,11 @@ if (runtime.startsWith("Node")) {
 }
 
 if (runtime.startsWith("Bun")) {
-  // Using both comments at the same time doesn't work for deno lint, deno check
-  // deno-lint-ignore no-undef -- Avoid importing @types/bun just for linting
-  // @ts-ignore
+  // @ts-ignore Bun
   readable = Bun.file("/dev/stdin").stream();
   writable = new WritableStream<Uint8Array>({
     async write(value) {
-      // deno-lint-ignore no-undef
-      // @ts-ignore
+      // @ts-ignore Bun
       await Bun.write(Bun.stdout, value);
     },
   }, new CountQueuingStrategy({ highWaterMark: Infinity }));
