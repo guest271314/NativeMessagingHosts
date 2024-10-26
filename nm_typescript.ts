@@ -38,11 +38,8 @@ let readable: NodeJS.ReadStream & { fd: 0 } | ReadableStream<Uint8Array>,
   exit: () => void = () => {};
 
 if (runtime.startsWith("Deno")) {
-  // @ts-ignore Deno
   ({ readable } = Deno.stdin);
-  // @ts-ignore Deno
   ({ writable } = Deno.stdout);
-  // @ts-ignore Deno
   ({ exit } = Deno);
 }
 
