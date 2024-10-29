@@ -89,7 +89,7 @@ try {
   sendMessage(encodeMessage(e.message));
   exit();
 }
-/*
+
 export {
   encodeMessage,
   exit,
@@ -98,4 +98,3 @@ export {
   sendMessage,
   writable,
 };
-*/
