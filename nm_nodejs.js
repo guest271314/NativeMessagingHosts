@@ -1,7 +1,7 @@
-#!/usr/bin/env -S /path/to/node --experimental-default-type=module
+#!/usr/bin/env -S /path/to/node
 // Node.js Native Messaging host
 // guest271314, 10-9-2022
-
+import process from "node:process";
 const buffer = new ArrayBuffer(0, {
   maxByteLength: 1024 ** 2
 });
