@@ -11,7 +11,7 @@
 declare let readable: NodeJS.ReadStream & {
     fd: 0;
 } | ReadableStream<Uint8Array>, writable: WritableStream<Uint8Array>, exit: () => void;
-declare function encodeMessage(message: any): Uint8Array;
+declare function encodeMessage(message: object): Uint8Array;
 declare function getMessage(): AsyncGenerator<Uint8Array>;
 declare function sendMessage(message: Uint8Array): Promise<void>;
 export { encodeMessage, exit, getMessage, readable, sendMessage, writable, };
