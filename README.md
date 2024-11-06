@@ -55,6 +55,7 @@ For differences between OS and browser implementations see [Chrome incompatibili
 - `nm_host.js` and `nm_host.ts` can be run by `node`, `deno`, and `bun`
 - `nm_bash_standalone.sh` does not use subshells
 - rhasspy/piper local TTS stream [native-messaging-piper](https://github.com/guest271314/native-messaging-piper)
+- JavaScript in WASM using Bytecode Alliance's Javy [nm_javy.js](https://github.com/guest271314/native-messaging-webassembly/blob/main/nm_javy.js), see [native-messaging-webassembly/README.md](https://github.com/guest271314/native-messaging-webassembly/blob/main/README.md)
 
 # License
 Do What the Fuck You Want to Public License [WTFPLv2](http://www.wtfpl.net/about/)
