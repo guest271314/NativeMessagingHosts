@@ -45,6 +45,14 @@ Installation and usage on Chrome and Chromium
 
 For differences between OS and browser implementations see [Chrome incompatibilities](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Chrome_incompatibilities#native_messaging). For Firefox or Nightly usage see also [Can't get response in Ubuntu #506](https://github.com/mdn/webextensions-examples/issues/506).
 
+# Testing 
+
+`nm_standalone_test.js` tests the Native Messaging hosts outside of the browser. Example usage
+
+```
+deno -A nm_standalone_test.js ./nm_nodejs.js native-messaging-extension://xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/
+```
+
 # Examples
 
 - Capture system and specific audio output, stream output to browser. [capture_system_audio](https://github.com/guest271314/captureSystemAudio/tree/master/native_messaging/capture_system_audio)
