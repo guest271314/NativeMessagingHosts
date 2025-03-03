@@ -64,6 +64,7 @@ deno -A nm_standalone_test.js ./nm_nodejs.js native-messaging-extension://xxxxxx
 - `nm_bash_standalone.sh` does not use subshells
 - rhasspy/piper local TTS stream [native-messaging-piper](https://github.com/guest271314/native-messaging-piper)
 - JavaScript in WASM using Bytecode Alliance's Javy [nm_javy.js](https://github.com/guest271314/native-messaging-webassembly/blob/main/nm_javy.js), see [native-messaging-webassembly/README.md](https://github.com/guest271314/native-messaging-webassembly/blob/main/README.md)
+- Write files to local file system from Web pages [native-messaging-file-writer](https://github.com/guest271314/native-messaging-file-writer)
 
 # License
 Do What the Fuck You Want to Public License [WTFPLv2](http://www.wtfpl.net/about/)
