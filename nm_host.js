@@ -19,7 +19,7 @@ if (runtime.startsWith("Deno")) {
   // ({ args } = Deno);
 }
 
-if (runtime.startsWith("Node") || runtime.startsWith("Bun")) {
+if (runtime.startsWith("Node")) {
   readable = process.stdin;
   writable = new WritableStream({
     write(value) {
@@ -29,15 +29,12 @@ if (runtime.startsWith("Node") || runtime.startsWith("Bun")) {
   ({ exit } = process);
   // ({ argv: args } = process);
 }
-// Bun.stdin.stream(), Bun.file(0).stream(), Bun.file("/dev/stdin").stream()
-// only reads 16384 bytes, then halts https://github.com/oven-sh/bun/issues/11553.
-// Use Node.js' process.stdin to read STDIN.
-/*
+
 if (runtime.startsWith("Bun")) {
   readable = Bun.file("/dev/stdin").stream();
   writable = new WritableStream({
-    async write(value) {
-      await Bun.write(Bun.stdout, value);
+    write(value) {
+      process.stdout.write(value);
     },
   }, new CountQueuingStrategy({ highWaterMark: Infinity }));
   ({ exit } = process);
