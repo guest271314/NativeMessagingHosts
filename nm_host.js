@@ -34,13 +34,14 @@ if (runtime.startsWith("Bun")) {
   readable = Bun.file("/dev/stdin").stream();
   writable = new WritableStream({
     write(value) {
-      process.stdout.write(value);
+      Bun.file("/dev/stdout")
+      .writer().write(value);
     },
-  }, new CountQueuingStrategy({ highWaterMark: Infinity }));
+  });
   ({ exit } = process);
   // ({ argv: args } = Bun);
 }
-*/
+
 function encodeMessage(message) {
   return encoder.encode(JSON.stringify(message));
 }
