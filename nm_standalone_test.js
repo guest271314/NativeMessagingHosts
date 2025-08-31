@@ -1,6 +1,7 @@
-// How to test the different hosts #2 
+// How to test the different hosts #2
 // https://github.com/guest271314/NativeMessagingHosts/discussions/2
-// deno -A nm_standalone_test.js ./nm_nodejs.js native-messaging-extension://xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/
+// deno -A nm_standalone_test.js /home/user/native-messaging-rust/nm_rust.rs \
+//   native-messaging-extension://xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/
 
 const [path, allowed_origin] = Deno.args;
 
@@ -10,14 +11,35 @@ const command = new Deno.Command(path, {
   stdin: "piped",
 });
 
+console.log(`\u001b[32mTesting ${path} Native Messaging host\u001b[0m\r\n`);
+
 const subprocess = command.spawn();
-const buffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 });
+const buffer = new ArrayBuffer(0, { maxByteLength: (1024 ** 2) });
 const view = new DataView(buffer);
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 function encodeMessage(message) {
   return encoder.encode(JSON.stringify(message));
+}
+// Handle SpiderMonkey, concatenate "\r\n\r\n" to end of message sent for js to read message
+const SPIDERMONKEY = path.includes("spidermonkey");
+
+async function sendMessage(input, data = encodeMessage("\r\n\r\n")) {
+  await new Blob([
+    new Uint8Array(new Uint32Array([input.length]).buffer),
+    input,
+  ])
+    .stream()
+    .pipeTo(subprocess.stdin, { preventClose: true });
+  if (SPIDERMONKEY) {
+    return await new Blob([
+      new Uint8Array(new Uint32Array([data.length]).buffer),
+      data,
+    ])
+      .stream()
+      .pipeTo(subprocess.stdin, { preventClose: true });
+  }
 }
 
 async function* getMessage(readable) {
@@ -59,55 +81,30 @@ async function* getMessage(readable) {
     Deno.exit();
   }
 })();
+// SpiderMonkey throws ArrayBuffer.prototype.resize: Invalid length parameter
+// for Array(209715), does print full test for Array(32768)
+let data = encodeMessage(Array(209715));
 
-let data = encodeMessage(Array(209715)); 
-
-await new Blob([
-  new Uint8Array(new Uint32Array([data.length]).buffer),
-  data,
-])
-  .stream()
-  .pipeTo(subprocess.stdin, { preventClose: true });
-
+await sendMessage(data);
 await new Promise((resolve) => setTimeout(resolve, 20));
 
 data = encodeMessage("test");
-await new Blob([
-  new Uint8Array(new Uint32Array([data.length]).buffer),
-  data,
-])
-  .stream()
-  .pipeTo(subprocess.stdin, { preventClose: true });
+await sendMessage(data);
 
 await new Promise((resolve) => setTimeout(resolve, 20));
 
 data = encodeMessage("");
-await new Blob([
-  new Uint8Array(new Uint32Array([data.length]).buffer),
-  data,
-])
-  .stream()
-  .pipeTo(subprocess.stdin, { preventClose: true });
+await sendMessage(data);
 
 await new Promise((resolve) => setTimeout(resolve, 20));
 
 data = encodeMessage(1);
-await new Blob([
-  new Uint8Array(new Uint32Array([data.length]).buffer),
-  data,
-])
-  .stream()
-  .pipeTo(subprocess.stdin, { preventClose: true });
+await sendMessage(data);
 
 await new Promise((resolve) => setTimeout(resolve, 20));
 
 data = encodeMessage(new Uint8Array([97]));
-await new Blob([
-  new Uint8Array(new Uint32Array([data.length]).buffer),
-  data,
-])
-  .stream()
-  .pipeTo(subprocess.stdin, { preventClose: true});
+await sendMessage(data);
 
 await new Promise((resolve) => setTimeout(resolve, 20));
 
