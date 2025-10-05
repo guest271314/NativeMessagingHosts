@@ -2,8 +2,8 @@ function getMessage(): ArrayBuffer {
   const header = new ArrayBuffer(4);
   process.stdin.read(header);
   const headerView = new DataView(header);
-  const messageLength: u32 = headerView.getUint32(0, true);
-  const messageBuffer = new ArrayBuffer(<i32> messageLength);
+  const messageLength: i32 = headerView.getUint32(0, true);
+  const messageBuffer = new ArrayBuffer(messageLength);
   const messageView = new DataView(messageBuffer);
   let index: i32 = 0;
   while (true) {
