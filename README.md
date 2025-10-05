@@ -17,6 +17,7 @@
 - Rust
 - `tee` command (Busybox; GNU Coreutils)
 - Static Hermes
+- AssemblyScript
 
 Tested echoing `new Array(209715)` (1 MB in JSON format) from client to host. 
 
