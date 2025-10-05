@@ -1,7 +1,7 @@
 /*
-#!/usr/bin/env -S /home/user/bin/deno -A /home/user/bin/nm_host.js
+#!/usr/bin/env -S /home/user/bin/deno /home/user/bin/nm_host.js
 #!/usr/bin/env -S /home/user/bin/node /home/user/bin/nm_host.js
-#!/usr/bin/env -S /home/user/bin/bun run /home/user/bin/nm_host.js
+#!/usr/bin/env -S /home/user/bin/bun /home/user/bin/nm_host.js
 */
 import * as process from "node:process";
 const runtime = navigator.userAgent;
@@ -31,10 +31,10 @@ if (runtime.startsWith("Node")) {
 }
 
 if (runtime.startsWith("Bun")) {
-  readable = Bun.file("/dev/stdin").stream();
+  readable = Bun.file(0).stream();
   writable = new WritableStream({
     write(value) {
-      Bun.file("/dev/stdout")
+      Bun.file(1)
       .writer().write(value);
     },
   });
@@ -74,7 +74,7 @@ async function* getMessage() {
 
 async function sendMessage(message) {
   await new Blob([
-    new Uint8Array(new Uint32Array([message.length]).buffer),
+    new Uint32Array([message.length]),
     message,
   ])
     .stream()
