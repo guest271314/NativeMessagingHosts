@@ -8,7 +8,7 @@
 */
 
 // Source JavaScript: https://github.com/guest271314/NativeMessagingHosts/blob/main/nm_host.js
-
+// https://github.com/microsoft/TypeScript/issues/62546#issuecomment-3374526284
 import process from "node:process";
 const runtime: string = navigator.userAgent;
 const buffer: ArrayBuffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 });
@@ -20,8 +20,11 @@ let readable: NodeJS.ReadStream & { fd: 0 } | ReadableStream<Uint8Array>,
   exit: () => void = () => {};
 
 if (runtime.startsWith("Deno")) {
+  // @ts-ignore Deno
   ({ readable } = Deno.stdin);
+  // @ts-ignore Deno
   ({ writable } = Deno.stdout);
+  // @ts-ignore Deno
   ({ exit } = Deno);
 }
 
@@ -48,11 +51,11 @@ if (runtime.startsWith("Bun")) {
   ({ exit } = process);
 }
 
-function encodeMessage(message: object): Uint8Array {
+function encodeMessage(message: object): Uint8Array<ArrayBuffer> {
   return encoder.encode(JSON.stringify(message));
 }
 
-async function* getMessage(): AsyncGenerator<Uint8Array> {
+async function* getMessage(): AsyncGenerator<Uint8Array<ArrayBuffer>> {
   let messageLength: number = 0;
   let readOffset: number = 0;
   for await (let message of readable) {
@@ -78,7 +81,7 @@ async function* getMessage(): AsyncGenerator<Uint8Array> {
   }
 }
 
-async function sendMessage(message: Uint8Array): Promise<void> {
+async function sendMessage(message: Uint8Array<ArrayBuffer>): Promise<void> {
   await new Blob([
     new Uint32Array([message.length]),
     message,
