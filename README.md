@@ -8,7 +8,7 @@
 - Node.js
 - Deno
 - Bun
-- WebAssembly/WASI
+- WebAssembly/WASI (C, C++, AssemblyScript, Bytecode Alliance Javy)
 - Bash
 - SpiderMonkey `js` shell
 - V8 `d8` shell
@@ -18,6 +18,7 @@
 - `tee` command (Busybox; GNU Coreutils)
 - Static Hermes
 - AssemblyScript
+- Bytecode Alliance Javy
 
 Tested echoing `new Array(209715)` (1 MB in JSON format) from client to host. 
 
