@@ -38,7 +38,7 @@ uint8_t* getMessage(size_t *inputLength) {
 }
 
 void sendMessage(uint8_t *response /*, int32_t responseLength */) {
-  const uint32_t responseLength = strlen(response);
+  const uint32_t responseLength = strlen((const char *)response);
   fwrite(&responseLength, sizeof responseLength, 1, stdout);
   fwrite(response, responseLength, 1, stdout);
   fflush(stdout);
