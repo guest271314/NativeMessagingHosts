@@ -1,76 +1,58 @@
-#!/usr/bin/env -S /path/to/node
+#!/usr/bin/env -S UV_THREADPOOL_SIZE=1 /home/user/bin/node --optimize-for-size --zero-unused-memory --memory-saver-mode --double-string-cache-size=1 --experimental-flush-embedded-blob-icache --jitless --expose-gc --v8-pool-size=1
 // Node.js Native Messaging host
 // guest271314, 10-9-2022
-import process from "node:process";
-const buffer = new ArrayBuffer(0, {
-  maxByteLength: 1024 ** 2
-});
-const view = new DataView(buffer);
+
+// try {port.postMessage(Array((209715*65)))} catch (e) {console.log(e)}
+// Error: Message exceeded maximum allowed size of 64MiB.
+const maxMessageLengthFromHost = 209715;
+let currentMessageLength = 0;
 const encoder = new TextEncoder();
-const readable = process.stdin;
-const writable = new WritableStream({
-  write(value) {
-    process.stdout.write(value);
+const decoder = new TextDecoder();
+const data = Array();
+// https://github.com/nodejs/node/issues/11568#issuecomment-282765300
+process.stdout._handle.setBlocking(false);
+
+for await (const nativeMessage of process.stdin) {
+  if (currentMessageLength === 0 && data.length === 0) {
+    const u8 = new Uint8Array(nativeMessage);
+    currentMessageLength = new DataView(u8.subarray(0, 4).buffer).getUint32(
+      0,
+      true,
+    );
+    data.push(...u8.subarray(4));
+  } else {
+    if (data.length < currentMessageLength) {
+      const u8 = new Uint8Array(nativeMessage);
+      data.push(...u8);
+    }
   }
-});
-const {
-  exit
-} = process;
-
-function encodeMessage(message) {
-  return encoder.encode(JSON.stringify(message));
-}
-
-async function* getMessage() {
-  let messageLength = 0;
-  let readOffset = 0;
-  for await (let message of readable) {
-    if (buffer.byteLength === 0 && messageLength === 0) {
-      buffer.resize(4);
-      for (let i = 0; i < 4; i++) {
-        view.setUint8(i, message[i]);
+  if (data.length && data.length === currentMessageLength) {
+    const json = JSON.parse(decoder.decode(new Uint8Array(data)));
+    if (Array.isArray(json) && json.length) {
+      for (let i = 0; i < json.length; i += maxMessageLengthFromHost) {
+        const message = encoder.encode(
+          JSON.stringify(json.slice(i, i + maxMessageLengthFromHost)),
+        );
+        process.stdout.write(new Uint32Array([message.length]));
+        process.stdout.write(message);
       }
-      messageLength = view.getUint32(0, true);
-      message = message.subarray(4);
-      buffer.resize(0);
+      await new Promise((resolve) => {
+        process.stdout.once("drain", resolve);
+      });
+      currentMessageLength = 0;
+      data.length = 0;
+      gc();
+      continue;
+    } else {
+      const message = encoder.encode(
+        JSON.stringify(json),
+      );
+      process.stdout.write(new Uint32Array([message.length]));
+      process.stdout.write(message);
     }
-    buffer.resize(buffer.byteLength + message.length);
-    for (let i = 0; i < message.length; i++, readOffset++) {
-      view.setUint8(readOffset, message[i]);
-    }
-    if (buffer.byteLength === messageLength) {
-      yield new Uint8Array(buffer);
-      messageLength = 0;
-      readOffset = 0;
-      buffer.resize(0);
-    }
+    currentMessageLength = 0;
+    data.length = 0;
+    gc();
+    continue;
   }
 }
-
-async function sendMessage(message) {
-  await new Blob([
-      new Uint8Array(new Uint32Array([message.length]).buffer),
-      message,
-    ])
-    .stream()
-    .pipeTo(writable, {
-      preventClose: true
-    });
-}
-
-try {
-  for await (const message of getMessage()) {
-    await sendMessage(message);
-  }
-} catch (e) {
-  exit();
-}
-
-export {
-  encodeMessage,
-  exit,
-  getMessage,
-  readable,
-  sendMessage,
-  writable,
-};
