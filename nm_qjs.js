@@ -2,8 +2,6 @@
 // QuickJS Native Messaging host
 // guest271314, 5-6-2022
 
-const maxMessageLengthFromHost = 209715;
-
 function getMessage() {
   const header = new Uint32Array(1);
   std.in.read(header.buffer, 0, 4);
