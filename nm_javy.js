@@ -1,9 +1,8 @@
 const stdin = 0;
 const stdout = 1;
-
-function encodeMessage(str) {
-  return new TextEncoder().encode(JSON.stringify(str));
-}
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+const maxMessageLengthFromHost = 209715;
 
 function getMessage() {
   let offset = 0;
@@ -23,14 +22,30 @@ function getMessage() {
   return message;
 }
 
-function sendMessage(json) {
-  let header = Uint32Array.from({
-    length: 4,
-  }, (_, index) => (json.length >> (index * 8)) & 0xff);
-  let output = new Uint8Array(header.length + json.length);
-  output.set(header, 0);
-  output.set(json, 4);
-  Javy.IO.writeSync(stdout, output);
+function sendMessage(data) {
+  const json = JSON.parse(decoder.decode(data));
+  if (Array.isArray(json) && json.length) {
+    for (let i = 0; i < json.length; i += maxMessageLengthFromHost) {
+      const message = encoder.encode(
+        JSON.stringify(json.slice(i, i + maxMessageLengthFromHost)),
+      );
+      let header = Uint32Array.from({
+        length: 4,
+      }, (_, index) => (message.length >> (index * 8)) & 0xff);
+      let output = new Uint8Array(header.length + message.length);
+      output.set(header, 0);
+      output.set(message, 4);
+      Javy.IO.writeSync(stdout, output);
+    }
+  } else {
+    let header = Uint32Array.from({
+      length: 4,
+    }, (_, index) => (data.length >> (index * 8)) & 0xff);
+    let output = new Uint8Array(header.length + data.length);
+    output.set(header, 0);
+    output.set(data, 4);
+    Javy.IO.writeSync(stdout, output);
+  }
 }
 
 function main() {
@@ -39,7 +54,7 @@ function main() {
       const message = getMessage();
       sendMessage(message);
     } catch (e) {
-      sendMessage(encodeMessage(e.message));
+      sendMessage(encoder.encode(JSON.stringify(e.message)));
     }
   }
 }
