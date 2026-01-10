@@ -6,6 +6,7 @@
 # than text, mode.
 # Python Native Messaging host
 # guest271314, 1-9-2026
+# https://discuss.python.org/t/how-to-support-optimized-64-mib-json-parsing-and-streaming-for-native-messaging-host/105567/9
 # https://github.com/guest271314/NativeMessagingHosts/blob/main/nm_nodejs.js
 # https://www.codeconvert.ai/javascript-to-python-converter?id=53a74277-8ee6-4f73-9c22-cb65296481ca
 import sys
