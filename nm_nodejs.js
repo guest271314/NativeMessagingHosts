@@ -166,9 +166,9 @@ async function getMessage() {
     }
     if (currentMessageLength === totalMessageLength) {
       sendMessage(new Uint8Array(ab));
-      // await new Promise((resolve) => {
-      //  process.stdout.once("drain", resolve);
-      // });
+      await new Promise((resolve) => {
+        process.stdout.once("drain", resolve);
+      });
       currentMessageLength = 0;
       totalMessageLength = 0;
       ab.resize(0);
