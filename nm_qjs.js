@@ -27,9 +27,9 @@ function sendMessage(message) {
 
     // Two writes are often better than allocating a new joined buffer
     // if the engine supports it. If not, combine them.
-    const output = new Uint8Array(4 + data.length);
+    const output = new Uint8Array(4 + message.length);
     output.set(header, 0);
-    output.set(data, 4);
+    output.set(message, 4);
     std.out.write(output.buffer, 0, output.length);
     std.out.flush();
     return;
