@@ -33,9 +33,9 @@ function sendMessage(messageBuffer: ArrayBuffer): void {
   // Handle small messages directly
   if (totalLen <= CHUNK_SIZE) {
     const messageBufferHeader = new ArrayBuffer(4);
-    new DataView(messageB).setUint32(
+    new DataView(messageBufferHeader).setUint32(
       0,
-      data.buffer.byteLength,
+      message.buffer.byteLength,
       true,
     );
     process.stdout.write(messageBufferHeader);
