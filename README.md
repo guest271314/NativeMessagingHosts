@@ -8,7 +8,7 @@
 - Node.js
 - Deno
 - Bun
-- WebAssembly/WASI/WAT (C, C++, AssemblyScript, Bytecode Alliance Javy)
+- WebAssembly/WAT/WASI (C, C++, AssemblyScript, Bytecode Alliance Javy, Rust)
 - Bash
 - SpiderMonkey `js` shell
 - V8 `d8` shell
