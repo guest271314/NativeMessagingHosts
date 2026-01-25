@@ -206,6 +206,40 @@ message=$(head -q -z --bytes=$((length)) /proc/${pid}/fd/0)
 printf "$message"
 `,
   ]];
+  const qjs = ["/home/user/bin/qjs", [
+    "--std",
+    "-m",
+    "-e",
+    `const path = "/proc/${pid}/fd/0";
+  try {
+    const size = new Uint32Array(1);
+    const err = { errno: 0 };
+    const pipe = std.open(
+      path,
+      "rb",
+      err,
+    );
+    if (err.errno !== 0) {
+      throw std.strerror(err.errno);
+    }
+    pipe.read(size.buffer, 0, 4);
+    // writeFile("len.txt", size);
+    // {error: 'writeFile is not defined'
+    const output = new Uint8Array(size[0]);
+    pipe.read(output.buffer, 0);
+    const res = new Uint8Array([...new Uint8Array(size.buffer),...output]);
+    std.out.write(res.buffer, 0, res.length);
+    std.out.flush();
+    std.exit(0);
+  } catch (e) {
+    const json = JSON.stringify({error:he.message});
+    std.out.write(Uint32Array.of(json.length).buffer, 0, 4);
+    std.out.puts(json);
+    std.out.flush();
+    std.exit(0);
+  }
+`,
+  ]];
   while (true) {
     // Terminate current process when chrome processes close
     if (!(os.system("pgrep", ["-P", JSON.parse(ppid)]))) {
