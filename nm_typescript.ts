@@ -59,6 +59,18 @@ async function* getMessage(): AsyncGenerator<Uint8Array<ArrayBuffer>> {
 
 async function sendMessage(message: Uint8Array<ArrayBuffer>): Promise<void> {
   const json = await new Response(message).json();
+  if (
+    typeof json === "number" ||
+    typeof json === "object" ||
+    typeof json === "string" ||
+    Array.isArray(json) &&
+      json.length < maxMessageLengthFromHost
+  ) {
+    process.stdout.write(new Uint32Array([message.length]));
+    process.stdout.write(message);
+    gc();
+    return;
+  }
   while (json.length) {
     const messageChunk = encoder.encode(
       JSON.stringify(json.splice(0, maxMessageLengthFromHost)),
