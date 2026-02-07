@@ -17,14 +17,8 @@ const view: DataView = new DataView(buffer);
 const encoder: TextEncoder = new TextEncoder();
 const decoder: TextDecoder = new TextDecoder();
 const maxMessageLengthFromHost: number = 209715;
-
-let readable: NodeJS.ReadStream & { fd: 0 } | ReadableStream<Uint8Array> =
+const readable: NodeJS.ReadStream & { fd: 0 } | ReadableStream<Uint8Array> =
     process.stdin,
-  writable: WritableStream<Uint8Array> = new WritableStream({
-    write(value) {
-      process.stdout.write(value);
-    },
-  }, new CountQueuingStrategy({ highWaterMark: Infinity })),
   exit: () => void = process.exit;
 
 function encodeMessage(message: object): Uint8Array<ArrayBuffer> {
@@ -64,7 +58,7 @@ async function sendMessage(message: Uint8Array<ArrayBuffer>): Promise<void> {
     typeof json === "object" ||
     typeof json === "string" ||
     Array.isArray(json) &&
-      json.length < maxMessageLengthFromHost
+      json.length <= maxMessageLengthFromHost
   ) {
     process.stdout.write(new Uint32Array([message.length]));
     process.stdout.write(message);
