@@ -132,9 +132,8 @@ async function main() {
     }
   } catch (e) {
     // Log error and exit gracefully
-    const errData = new TextEncoder().encode(JSON.stringify("test"));
     const err = tjs.open("err.txt", "w", 0o755);
-    err.then(() => err.write(errData))
+    err.then(() => err.write(new TextEncoder().encode(e.message)))
       .then(() => err.close())
       .then(() => tjs.exit(1));
   }
