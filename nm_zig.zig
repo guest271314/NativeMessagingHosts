@@ -1,3 +1,6 @@
+//usr/bin/env -S /home/user/bin/zig run "$0"
+// https://discord.com/channels/605571803288698900/719644313348341760/1472640833718059119
+// https://youtu.be/cFtymODJEjs?t=773
 // Zig Native Messaging host
 // guest271314, 2-14-2026
 // Source: Node.js Native Messaging host https://github.com/guest271314/native-messaging-nodejs/nm_nodejs.js
@@ -5,7 +8,7 @@
 const std = @import("std");
 
 const CHUNK_SIZE = 1024 * 1024;
-
+/// while loop to read STDIN from browser, write to STDOUT to browser
 pub fn main() !void {
   var gpa = std.heap.GeneralPurposeAllocator(.{}){};
   defer _ = gpa.deinit();
@@ -16,13 +19,12 @@ pub fn main() !void {
     if (err == error.EndOfStream) break;
     return err;
   };
-  defer allocator.free(message);
 
   try sendMessage(message, allocator);
   }
 }
-
-fn getMessage(allocator: std.mem.Allocator) ![]u8 {
+/// Read STDIN from browser
+pub fn getMessage(allocator: std.mem.Allocator) ![]u8 {
   const fd: i32 = 0; // STDIN
   var h_buf: [4]u8 = undefined;
   
@@ -42,8 +44,8 @@ fn getMessage(allocator: std.mem.Allocator) ![]u8 {
   }
   return buf;
 }
-
-fn sendMessage(message: []const u8, allocator: std.mem.Allocator) !void {
+/// Write to STDOUT to browser
+pub fn sendMessage(message: []const u8, allocator: std.mem.Allocator) !void {
   const fd: i32 = 1; // STDOUT
 
   if (message.len <= CHUNK_SIZE) {
