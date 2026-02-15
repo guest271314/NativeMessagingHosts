@@ -19,6 +19,8 @@
 - Static Hermes
 - AssemblyScript
 - Bytecode Alliance Javy
+- Go
+- Zig
 
 Tested echoing `new Array(209715)` (1 MB in JSON format) from client to host. 
 
