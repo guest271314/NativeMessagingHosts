@@ -1,43 +1,95 @@
 #!/usr/bin/env -S /home/user/bin/tjs run
-// txiki.js Native Messaging host
 // guest271314, 2-10-2023
-// 
-// https://github.com/denoland/deno/discussions/17236#discussioncomment-4566134
-// https://github.com/saghul/txiki.js/blob/master/src/js/core/tjs/eval-stdin.js
-// https://gemini.google.com/share/continue/4372b594e5a1
-/**
- * READS a message from stdin
- * Handled asynchronously for txiki.js
- */
-async function getMessage() {
-  const header = new Uint8Array(4);
-  let readHeader = 0;
+//
+// #!/usr/bin/env -S DENO_COMPAT=1 /home/user/bin/deno -A --v8-flags="--expose-gc"
+// #!/usr/bin/env -S /home/user/bin/bun -b --expose-gc
+// #!/usr/bin/env -S UV_THREADPOOL_SIZE=1 /home/user/bin/node --optimize-for-size --zero-unused-memory --memory-saver-mode --double-string-cache-size=1 --experimental-flush-embedded-blob-icache --jitless --expose-gc --v8-pool-size=1
 
-  // 1. Read the 4-byte length header
-  while (readHeader < 4) {
-    const n = await tjs.stdin.read(header.subarray(readHeader));
-    if (n === null || n === 0) return null; // Pipe closed
-    readHeader += n;
+if (!Object.hasOwn(globalThis, "process")) {
+  if (navigator.userAgent.startsWith("txiki.js")) {
+    Object.assign(globalThis, {
+      process: {
+        stdin: tjs.stdin,
+        stdout: tjs.stdout.getWriter(),
+        exit: tjs.exit,
+      },
+      gc: tjs.engine.gc.run,
+    });
   }
-
-  const length = (header[0]) | (header[1] << 8) | (header[2] << 16) |
-    (header[3] << 24);
-  const output = new Uint8Array(length);
-  let readBody = 0;
-
-  // 2. Read the body based on the header length
-  while (readBody < length) {
-    const n = await tjs.stdin.read(output.subarray(readBody));
-    if (n === null || n === 0) break;
-    readBody += n;
-  }
-
-  return output;
 }
 
+process.stdout?._handle?.setBlocking(true);
+process.stdin?._handle?.setBlocking(true);
+
+const ab = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 * 64 });
+let totalMessageLength = 0;
+let currentMessageLength = 0;
+
 /**
- * SENDS a message to stdout
- * Chunked logic adapted for txiki.js asynchronous output
+ * Handles assembly of incoming stdin stream into messages.
+ */
+async function* getMessage() {
+  let headerUint8 = new Uint8Array(0);
+
+  const concatUint8 = (a, b) => {
+    const res = new Uint8Array(a.length + b.length);
+    res.set(a);
+    res.set(b, a.length);
+    return res;
+  };
+
+  for await (const data of process.stdin) {
+    let chunk = new Uint8Array(data);
+
+    while (chunk.length > 0) {
+      // 1. Accumulate/Read the 4-byte length header
+      if (totalMessageLength === 0) {
+        if (headerUint8.length + chunk.length < 4) {
+          headerUint8 = concatUint8(headerUint8, chunk);
+          break;
+        }
+
+        const combinedHeader = concatUint8(
+          headerUint8,
+          chunk.subarray(0, 4 - headerUint8.length),
+        );
+        const view = new DataView(combinedHeader.buffer);
+        totalMessageLength = view.getUint32(0, true);
+
+        chunk = chunk.subarray(4 - headerUint8.length);
+        headerUint8 = new Uint8Array(0);
+
+        ab.resize(totalMessageLength);
+        currentMessageLength = 0;
+      }
+
+      // 2. Fill the message buffer
+      const remainingNeeded = totalMessageLength - currentMessageLength;
+      const toCopy = chunk.subarray(0, remainingNeeded);
+
+      new Uint8Array(ab).set(toCopy, currentMessageLength);
+      currentMessageLength += toCopy.length;
+      chunk = chunk.subarray(toCopy.length);
+
+      // 3. Dispatch message when complete
+      if (
+        currentMessageLength === totalMessageLength && totalMessageLength > 0
+      ) {
+        yield new Uint8Array(ab);
+
+        // Reset state for next message
+        totalMessageLength = 0;
+        currentMessageLength = 0;
+        ab.resize(0);
+        if (typeof gc === "function") gc();
+      }
+    }
+  }
+}
+
+// https://gist.github.com/guest271314/c88d281572aadb2cc6265e3e9eb09810
+/**
+ * Sends messages to stdout with chunking for large payloads and backpressure handling.
  */
 async function sendMessage(message) {
   const COMMA = 44;
@@ -45,20 +97,25 @@ async function sendMessage(message) {
   const CLOSE_BRACKET = 93;
   const CHUNK_SIZE = 1024 * 1024; // 1MB
 
-  // Case 1: Small message
-  if (message.length <= CHUNK_SIZE) {
-    const output = new Uint8Array(4 + message.length);
-    output[0] = (message.length >> 0) & 0xff;
-    output[1] = (message.length >> 8) & 0xff;
-    output[2] = (message.length >> 16) & 0xff;
-    output[3] = (message.length >> 24) & 0xff;
-    output.set(message, 4);
+  // Internal helper to write and wait for drain if necessary
+  const writeAndDrain = async (data) => {
+    if (!process.stdout.write(data)) {
+      await new Promise((resolve) =>
+        process.stdout?.once ? process.stdout.once("drain", resolve) : resolve()
+      );
+    }
+  };
 
-    await tjs.stdout.write(output);
+  // Small message: Send directly
+  if (message.length <= CHUNK_SIZE) {
+    const header = new Uint8Array(4);
+    new DataView(header.buffer).setUint32(0, message.length, true);
+    await writeAndDrain(header);
+    await writeAndDrain(message);
     return;
   }
 
-  // Case 2: Large message (Chunking logic)
+  // Large message: Chunking logic to maintain JSON array validity
   let index = 0;
   while (index < message.length) {
     let splitIndex;
@@ -75,68 +132,60 @@ async function sendMessage(message) {
     const startByte = rawChunk[0];
     const endByte = rawChunk[rawChunk.length - 1];
 
-    let hasPrepend = startByte === COMMA;
-    let hasAppend = endByte !== CLOSE_BRACKET;
+    let prepend = null;
+    let append = null;
 
-    // Match original logic: if start is '[', ensure it has ']'
     if (startByte === OPEN_BRACKET && endByte !== CLOSE_BRACKET) {
-      hasAppend = true;
+      append = CLOSE_BRACKET;
+    } else if (startByte === COMMA) {
+      prepend = OPEN_BRACKET;
+      if (endByte !== CLOSE_BRACKET) append = CLOSE_BRACKET;
     }
 
-    let sourceOffset = (startByte === COMMA) ? 1 : 0;
-    let bodyLength = rawChunk.length - sourceOffset;
+    let bodyLength = rawChunk.length;
+    let sourceOffset = 0;
+    if (startByte === COMMA) {
+      sourceOffset = 1;
+      bodyLength -= 1;
+    }
 
-    // Total = Header(4) + Prepend(1 if comma/needed) + Body + Append(1 if needed)
-    const totalLength = 4 + (hasPrepend ? 1 : 0) + bodyLength +
-      (hasAppend ? 1 : 0);
+    const hasPrepend = prepend !== null;
+    const hasAppend = append !== null;
+    const totalLength = 4 + (hasPrepend || startByte === COMMA ? 1 : 0) +
+      bodyLength + (hasAppend ? 1 : 0);
+
     const output = new Uint8Array(totalLength);
+    const dataLen = totalLength - 4;
 
-    // Write Header
-    const payloadLen = totalLength - 4;
-    output[0] = (payloadLen >> 0) & 0xff;
-    output[1] = (payloadLen >> 8) & 0xff;
-    output[2] = (payloadLen >> 16) & 0xff;
-    output[3] = (payloadLen >> 24) & 0xff;
+    // Header
+    const view = new DataView(output.buffer);
+    view.setUint32(0, dataLen, true);
 
     let cursor = 4;
-    if (hasPrepend) {
-      output[cursor++] = OPEN_BRACKET;
+    if (hasPrepend || startByte === COMMA) {
+      output[cursor] = OPEN_BRACKET;
+      cursor++;
     }
 
     output.set(rawChunk.subarray(sourceOffset), cursor);
     cursor += bodyLength;
 
     if (hasAppend) {
-      output[cursor] = CLOSE_BRACKET;
+      output[cursor] = append;
     }
 
-    await tjs.stdout.write(output);
-
-    // Increment and GC
+    await writeAndDrain(output);
     index = splitIndex;
-    if (index % (CHUNK_SIZE * 5) === 0) {
-      tjs.engine.gc.run();
-    }
   }
 }
 
 /**
- * MAIN LOOP
+ * Main execution entry point
  */
 async function main() {
-  try {
-    while (true) {
-      const message = await getMessage();
-      await sendMessage(message);
-      tjs.engine.gc.run();
-    }
-  } catch (e) {
-    // Log error and exit gracefully
-    const err = tjs.open("err.txt", "w", 0o755);
-    err.then(() => err.write(new TextEncoder().encode(e.message)))
-      .then(() => err.close())
-      .then(() => tjs.exit(1));
+  for await (const message of getMessage()) {
+    await sendMessage(message);
   }
 }
 
-main();
+main().catch(() => process.exit(1));
