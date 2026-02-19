@@ -73,7 +73,7 @@ async function* getMessage() {
     }
   }
 }
-
+// https://github.com/quickjs-ng/quickjs/discussions/1291#discussioncomment-15407408
 // https://gist.github.com/guest271314/c88d281572aadb2cc6265e3e9eb09810
 /**
  * Sends messages to stdout with chunking for large payloads and backpressure handling.
