@@ -1,21 +1,25 @@
 async function nativeMessagingPerformanceTest(i = 10) {
   const runtimes = new Map([
     ["nm_assemblyscript", 0],
+    ["nm_bash", 0],
     ["nm_bun", 0],
     ["nm_c", 0],
     ["nm_cpp", 0],
-    ["nm_d8", 0], // Uses subprocess to read STDIN
+    ["nm_d8", 0],
     ["nm_deno", 0],
-    ["nm_llrt", 0], // Uses subprocess to read STDIN
+    ["nm_llrt", 0],
     ["nm_nodejs", 0],
     ["nm_python", 0],
     ["nm_qjs", 0],
     ["nm_rust", 0],
     ["nm_shermes", 0],
-    ["nm_spidermonkey", 0], // Special treatment, requires additional "\r\n\r\n" from client
+    ["nm_spidermonkey", 0],
     ["nm_tjs", 0],
     ["nm_typescript", 0],
     ["nm_wasm", 0],
+    ["nm_zig", 0],
+    ["nm_go", 0],
+    ["nm_lua", 0],
   ]);
   for (let j = 0; j < i; j++) {
     for (const [runtime] of runtimes) {
@@ -46,8 +50,8 @@ async function nativeMessagingPerformanceTest(i = 10) {
         continue;
       }
     }
-    await scheduler.postTask(() => {
-      delay: 10;
+    await scheduler.postTask(() => {}, {
+      delay: 10,
     });
   }
   const sorted = [...runtimes].map(([k, n]) => [k, n / i]).sort((
