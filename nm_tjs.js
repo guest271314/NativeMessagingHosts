@@ -18,8 +18,8 @@ if (!Object.hasOwn(globalThis, "process")) {
   }
 }
 
-process.stdout?._handle?.setBlocking(true);
-process.stdin?._handle?.setBlocking(true);
+process.stdout?._handle?.setBlocking?.(true);
+process.stdin?._handle?.setBlocking?.(true);
 
 const ab = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 * 64 });
 let totalMessageLength = 0;
@@ -99,7 +99,7 @@ async function sendMessage(message) {
 
   // Internal helper to write and wait for drain if necessary
   const writeAndDrain = async (data) => {
-    if (!process.stdout.write(data)) {
+    if (!(await process.stdout.write(data))) {
       await new Promise((resolve) =>
         process.stdout?.once ? process.stdout.once("drain", resolve) : resolve()
       );
@@ -108,10 +108,10 @@ async function sendMessage(message) {
 
   // Small message: Send directly
   if (message.length <= CHUNK_SIZE) {
-    const header = new Uint8Array(4);
-    new DataView(header.buffer).setUint32(0, message.length, true);
-    await writeAndDrain(header);
-    await writeAndDrain(message);
+    const output = new Uint8Array(4 + message.length);
+    output.set(new Uint32Array([message.length]), 0);
+    output.set(message, 4);
+    await writeAndDrain(output);
     return;
   }
 
