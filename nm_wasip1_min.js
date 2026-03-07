@@ -7,8 +7,8 @@
 import * as process from "node:process";
 import fs from "node:fs";
 // https://github.com/nodejs/node/issues/11568#issuecomment-282765300
-process.stdout?._handle?.setBlocking(true);
-process.stdin?._handle?.setBlocking(true);
+process.stdout?._handle?.setBlocking?.(true);
+process.stdin?._handle?.setBlocking?.(true);
 // Minimal WASI Preview 1
 // https://github.com/WebAssembly/WASI/tree/wasi-0.1
 const ERRNO_SUCCESS = 0;
