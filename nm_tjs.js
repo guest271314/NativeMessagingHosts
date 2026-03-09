@@ -69,14 +69,13 @@ async function sendMessage(message) {
   const CLOSE_BRACKET = 93;
   const CHUNK_SIZE = 1024 * 1024;
   if (message.length <= CHUNK_SIZE) {
-    await process.stdout.write(
-      new Uint8Array(
-        new Uint32Array([
-          message.length,
-        ]).buffer,
-      ),
-    );
-    await process.stdout.write(message);
+    const data = new Uint8Array(4 + message.length);
+    data[0] = message.length >> 0 & 255;
+    data[1] = message.length >> 8 & 255;
+    data[2] = message.length >> 16 & 255;
+    data[3] = message.length >> 24 & 255;
+    data.set(message, 4);
+    await process.stdout.write(data);
     return;
   }
   let index = 0;
