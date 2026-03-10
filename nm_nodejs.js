@@ -1,8 +1,9 @@
 #!/usr/bin/env -S UV_THREADPOOL_SIZE=1 /home/user/bin/node --expose-gc --memory-saver-mode --v8-pool-size=1 --jitless --zero-unused-memory
-// guest271314, 10-9-2022
-//
-// #!/usr/bin/env -S DENO_COMPAT=1 /home/user/bin/deno -A --v8-flags="--expose-gc"
-// #!/usr/bin/env -S /home/user/bin/bun --expose-gc
+//! Node.js Native Messaging host
+//! guest271314, 10-9-2022
+//!
+//! #!/usr/bin/env -S DENO_COMPAT=1 /home/user/bin/deno -A --v8-flags="--expose-gc"
+//! #!/usr/bin/env -S /home/user/bin/bun --expose-gc
 
 process.stdout?._handle?.setBlocking(true);
 process.stdin?._handle?.setBlocking(true);
