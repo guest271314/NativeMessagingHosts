@@ -56,8 +56,7 @@ async function* getMessage(): AsyncGenerator<Uint8Array<ArrayBuffer>> {
         u8.set(chunk, currentMessageLength);
         currentMessageLength += chunk.length;
       }
-    }      // Note: buffer.resize is a newer feature (ES2024).
-      // Ensure your Node version supports it.
+    }
 
     if (currentMessageLength === totalMessageLength) {
       yield new Uint8Array(buffer);
