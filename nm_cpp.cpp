@@ -1,8 +1,10 @@
 // C++ Native Messaging host
+// guest271314, 2022
 // https://browserext.github.io/native-messaging/
 // https://developer.chrome.com/docs/apps/nativeMessaging/
 // https://www.reddit.com/user/Eternal_Weeb/
-// guest271314, 2022
+// clang++ nm_cpp.cpp -std=c++20 -o nm_cpp
+// wasi-sdk/bin/clang++ nm_cpp.cpp -std=c++2a -fno-exceptions -o nm_cpp.wasm
 
 /*
 Can you further optimize this C++ Native Messaging host that handles 64 MiB
@@ -175,7 +177,7 @@ void sendMessage(std::span<const uint8_t> message) noexcept {
     if (first == OPEN_BRACKET) [[likely]] {
       if (last != CLOSE_BRACKET) {
         append = CLOSE_BRACKET;
-      }-std=c++20
+      }
     } else if (first == COMMA) {
       prepend = OPEN_BRACKET;
       body = body.subspan(1); // Skip the leading comma
@@ -210,9 +212,9 @@ int main() {
     size_t messageLength = 0;
     std::vector<uint8_t> message = getMessage(messageLength);
 
-    // if (messageLength == 0) {
-    //    break;
-    // }
+    if (messageLength == 0) {
+      break;
+    }
 
     sendMessage(message);
   }
