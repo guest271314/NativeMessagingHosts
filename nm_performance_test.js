@@ -7,19 +7,20 @@ async function nativeMessagingPerformanceTest(i = 10) {
     ["nm_cpp", 0],
     ["nm_d8", 0],
     ["nm_deno", 0],
+    ["nm_go", 0],
+    ["nm_lua", 0],
     ["nm_llrt", 0],
     ["nm_nodejs", 0],
     ["nm_python", 0],
     ["nm_qjs", 0],
+    ["nm_ruby", 0],
     ["nm_rust", 0],
     ["nm_shermes", 0],
     ["nm_spidermonkey", 0],
     ["nm_tjs", 0],
     ["nm_typescript", 0],
     ["nm_wasm", 0],
-    ["nm_zig", 0],
-    ["nm_go", 0],
-    ["nm_lua", 0],
+    ["nm_zig", 0]
   ]);
   for (let j = 0; j < i; j++) {
     for (const [runtime] of runtimes) {
