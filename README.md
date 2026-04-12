@@ -63,6 +63,15 @@ For differences between OS and browser implementations see [Chrome incompatibili
 deno -A nm_standalone_test.js ./nm_nodejs.js native-messaging-extension://xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/
 ```
 
+`nm_browser_test.js` tests the Native Messaging hosts inside of the browser. Add the extension ID of a given extension to each host manifest in `"allowed_origins"`, run the code in DevTools in that given extension. Example usage
+
+```
+// Echo 1 MiB to/from each host 100 times, print average time of each host to complete `N` roundtrips
+await nativeMessagingPerformanceTest(100 /* N, default = 10 */);
+```
+
+
+
 # Examples
 
 - Capture system and specific audio output, stream output to browser. [capture_system_audio](https://github.com/guest271314/captureSystemAudio/tree/master/native_messaging/capture_system_audio)
