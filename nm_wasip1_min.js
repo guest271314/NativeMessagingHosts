@@ -37,9 +37,7 @@ class WASIP1_MIN {
         type: FILETYPE_CHARACTER_DEVICE,
         handle: process.stderr,
       },
-    ];// #!/usr/bin/env -S /home/user/bin/node
-// #!/usr/bin/env -S /home/user/bin/deno -A
-//
+    ];
     this.exports = {
       args_get: (argv_ptr, argv_buf_ptr) => {
         const args = this.args;
