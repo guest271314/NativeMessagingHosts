@@ -26,11 +26,7 @@ into the buffer anyway (no need to zero-initialize)
 cache-friendly)
 - Used `const` pointers where appropriate to help compiler optimizations
 
-**3. I/O Optimization**// Native Messaging host C - Optimized
-// https://stackoverflow.com/q/64400254
-// https://gist.github.com/zed/4459378be67a4b37f53430e0703cb700
-// https://www.reddit.com/r/C_Programming/comments/y4omt0/how_to_fix_memory_leak/
-// guest271314, 2022
+**3. I/O Optimization**
 - Added large I/O buffers (`setvbuf`) to reduce system calls
 - Combined write operations where possible
 
