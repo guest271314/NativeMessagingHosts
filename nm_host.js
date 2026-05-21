@@ -5,7 +5,7 @@
 */
 import * as process from "node:process";
 const runtime = navigator.userAgent;
-const buffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 *64 });
+const buffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 * 64 });
 const view = new DataView(buffer);
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -31,23 +31,25 @@ if (runtime.startsWith("Node") || runtime.startsWith("Bun")) {
   ({ exit } = process);
   // ({ argv: args } = process);
 }
-// There's some kind of internal buffer limitation here, 
+// There's some kind of internal buffer limitation here,
 // use Node.js' process.stdin and process.stdout
 // https://github.com/oven-sh/bun/issues/11553
 // https://github.com/oven-sh/bun/issues/11712
-/*
-if (runtime.startsWith("Bun")) {
-  readable = Bun.file(0).stream();
+
+if (runtime.startsWith("__Bun")) {
+  readable = Bun.stdin.stream();
   writable = new WritableStream({
     write(value) {
       Bun.file(1)
-      .writer().write(value);
+        .writer().write(value);
     },
   });
   ({ exit } = process);
   // ({ argv: args } = Bun);
 }
-*/
+
+let writer = writable.getWriter();
+
 function encodeMessage(message) {
   return encoder.encode(JSON.stringify(message));
 }
@@ -80,17 +82,24 @@ async function* getMessage() {
 
 async function sendMessage(message) {
   const json = JSON.parse(decoder.decode(message));
-  for (let i = 0; i < json.length; i += maxMessageLengthFromHost) {
-    const messageChunk = encoder.encode(
-      JSON.stringify(json.slice(i, i + maxMessageLengthFromHost)),
+  if (Array.isArray(json)) {
+    for (let i = 0; i < json.length; i += maxMessageLengthFromHost) {
+      const messageChunk = encoder.encode(
+        JSON.stringify(json.slice(i, i + maxMessageLengthFromHost)),
+      );
+      await writer.write(
+        new Uint8Array(new Uint32Array([messageChunk.length]).buffer),
+      );
+      await writer.write(messageChunk);
+      await writer.ready;
+    }
+  } else {
+    const encoded = encodeMessage(json);
+    await writer.write(
+      new Uint8Array(new Uint32Array([encoded.length]).buffer),
     );
-    await new Blob([
-      new Uint8Array(new Uint32Array([messageChunk.length]).buffer),
-      messageChunk,
-    ])
-    .stream()
-    .pipeTo(writable, { preventClose: true });
-    gc();
+    await writer.write(encoded);
+    await writer.ready;
   }
 }
 
@@ -98,18 +107,11 @@ try {
   // await sendMessage(encodeMessage([{ dirname, filename, url }, ...args]));
   for await (const message of getMessage()) {
     await sendMessage(message);
-    gc();
+    // gc();
   }
 } catch (e) {
   sendMessage(encodeMessage(e.message));
   exit();
 }
 
-export {
-  encodeMessage,
-  exit,
-  getMessage,
-  readable,
-  sendMessage,
-  writable,
-};
+export { encodeMessage, exit, getMessage, readable, sendMessage, writable };
