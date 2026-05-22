@@ -5,6 +5,8 @@
 
 const [path, allowed_origin] = Deno.args;
 
+console.log({ path, allowed_origin });
+
 const command = new Deno.Command(path, {
   args: [allowed_origin],
   stdout: "piped",
@@ -14,7 +16,7 @@ const command = new Deno.Command(path, {
 console.log(`\u001b[32mTesting ${path} Native Messaging host\u001b[0m\r\n`);
 
 const subprocess = command.spawn();
-const buffer = new ArrayBuffer(0, { maxByteLength: (1024 ** 2) });
+const buffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 });
 const view = new DataView(buffer);
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -71,41 +73,52 @@ async function* getMessage(readable) {
   }
 }
 
+let controller = void 0;
+
+const readable = new ReadableStream({
+  start(c) {
+    return controller = c;
+  },
+});
+
+const reader = readable.getReader();
+
+async function echoNativeMessage(input) {
+  const data = encodeMessage(input);
+  await sendMessage(data);
+  const { value, done } = await reader.read();
+  console.log(value);
+}
+
 (async () => {
   try {
     for await (const message of getMessage(subprocess.stdout)) {
-      console.log(JSON.parse(decoder.decode(message)));
+      controller.enqueue({ message: JSON.parse(decoder.decode(message)) });
     }
   } catch (e) {
     console.log(e.message);
     Deno.exit();
   }
 })();
+
 // SpiderMonkey throws ArrayBuffer.prototype.resize: Invalid length parameter
 // for Array(209715), does print full test for Array(32768)
-let data = encodeMessage(Array(209715));
 
-await sendMessage(data);
-await new Promise((resolve) => setTimeout(resolve, 20));
-
-data = encodeMessage("test");
-await sendMessage(data);
-
-await new Promise((resolve) => setTimeout(resolve, 20));
-
-data = encodeMessage("");
-await sendMessage(data);
-
-await new Promise((resolve) => setTimeout(resolve, 20));
-
-data = encodeMessage(1);
-await sendMessage(data);
-
-await new Promise((resolve) => setTimeout(resolve, 20));
-
-data = encodeMessage(new Uint8Array([97]));
-await sendMessage(data);
-
-await new Promise((resolve) => setTimeout(resolve, 20));
-
-subprocess.kill("SIGTERM");
+try {
+  for (
+    const message of [
+      Array(209715),
+      "test",
+      "",
+      1,
+      new Uint8Array([97]),
+    ]
+  ) {
+    await echoNativeMessage(message);
+  }
+  controller.close();
+} catch (e) {
+  console.log(e.stack);
+} finally {
+  subprocess.kill("SIGTERM");
+}
