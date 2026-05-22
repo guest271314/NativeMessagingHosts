@@ -1,18 +1,22 @@
+// JavaScript runtime agnostic Native Messaging host
+// Tested: Node.js, Deno, Bun, txiki.js
+// guest271314
 /*
-#!/usr/bin/env -S /home/user/bin/deno -A --v8-flags="--expose-gc" /home/user/bin/nm_host.js
-#!/usr/bin/env -S /home/user/bin/node --expose-gc /home/user/bin/nm_host.js
-#!/usr/bin/env -S /home/user/bin/bun --expose-gc /home/user/bin/nm_host.js
+#!/usr/bin/env -S /home/user/bin/deno -A /home/user/bin/nm_host.js
+#!/usr/bin/env -S /home/user/bin/node /home/user/bin/nm_host.js
+#!/usr/bin/env -S /home/user/bin/bun -b --no-cache /home/user/bin/nm_host.js
+#!/usr/bin/env -S /home/user/bin/tjs run
 */
-import * as process from "node:process";
+
 const runtime = navigator.userAgent;
-const buffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 * 64 });
+const buffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 });
 const view = new DataView(buffer);
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const maxMessageLengthFromHost = 209715;
 // const { dirname, filename, url } = import.meta;
 
-let readable, writable, exit; // args
+let readable, writable, exit; //args
 
 if (runtime.startsWith("Deno")) {
   ({ readable } = Deno.stdin);
@@ -21,7 +25,7 @@ if (runtime.startsWith("Deno")) {
   // ({ args } = Deno);
 }
 
-if (runtime.startsWith("Node") || runtime.startsWith("Bun")) {
+if (runtime.startsWith("Node")) {
   readable = process.stdin;
   writable = new WritableStream({
     write(value) {
@@ -31,24 +35,30 @@ if (runtime.startsWith("Node") || runtime.startsWith("Bun")) {
   ({ exit } = process);
   // ({ argv: args } = process);
 }
-// There's some kind of internal buffer limitation here,
-// use Node.js' process.stdin and process.stdout
-// https://github.com/oven-sh/bun/issues/11553
-// https://github.com/oven-sh/bun/issues/11712
 
-if (runtime.startsWith("__Bun")) {
+if (runtime.startsWith("Bun")) {
   readable = Bun.stdin.stream();
   writable = new WritableStream({
-    write(value) {
-      Bun.file(1)
-        .writer().write(value);
+    async write(value) {
+      const fileSink = Bun.stdout.writer({ highWaterMark: Infinity });
+      fileSink.start({ highWaterMark: Infinity });
+      const n0 = fileSink.write(value);
+      const n1 = await fileSink.flush();
+      const n2 = await fileSink.end();
     },
   });
   ({ exit } = process);
   // ({ argv: args } = Bun);
 }
 
-let writer = writable.getWriter();
+if (runtime.startsWith("txiki.js")) {
+  ({ stdin: readable } = tjs);
+  ({ stdout: writable } = tjs);
+  ({ exit } = tjs);
+  //({ args } = tjs);
+}
+
+const writer = writable.getWriter();
 
 function encodeMessage(message) {
   return encoder.encode(JSON.stringify(message));
@@ -63,6 +73,7 @@ async function* getMessage() {
       for (let i = 0; i < 4; i++) {
         view.setUint8(i, message[i]);
       }
+
       messageLength = view.getUint32(0, true);
       message = message.subarray(4);
       buffer.resize(0);
@@ -82,23 +93,23 @@ async function* getMessage() {
 
 async function sendMessage(message) {
   const json = JSON.parse(decoder.decode(message));
-  if (Array.isArray(json)) {
+  if (Array.isArray(json) && json.length > maxMessageLengthFromHost) {
     for (let i = 0; i < json.length; i += maxMessageLengthFromHost) {
       const messageChunk = encoder.encode(
         JSON.stringify(json.slice(i, i + maxMessageLengthFromHost)),
       );
-      await writer.write(
-        new Uint8Array(new Uint32Array([messageChunk.length]).buffer),
-      );
-      await writer.write(messageChunk);
+      const u8 = new Uint8Array(4 + messageChunk.length);
+      u8.set(new Uint8Array(new Uint32Array([messageChunk.length]).buffer), 0);
+      u8.set(messageChunk, 4);
+      await writer.write(u8);
       await writer.ready;
     }
   } else {
     const encoded = encodeMessage(json);
-    await writer.write(
-      new Uint8Array(new Uint32Array([encoded.length]).buffer),
-    );
-    await writer.write(encoded);
+    const u8 = new Uint8Array(4 + encoded.length);
+    u8.set(new Uint8Array(new Uint32Array([encoded.length]).buffer), 0);
+    u8.set(encoded, 4);
+    return await writer.write(u8);
     await writer.ready;
   }
 }
@@ -107,7 +118,6 @@ try {
   // await sendMessage(encodeMessage([{ dirname, filename, url }, ...args]));
   for await (const message of getMessage()) {
     await sendMessage(message);
-    // gc();
   }
 } catch (e) {
   sendMessage(encodeMessage(e.message));
