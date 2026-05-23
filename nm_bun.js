@@ -1,66 +1,87 @@
-#!/usr/bin/env -S ./bun run --no-install --hot
+#!/usr/bin/env -S /home/user/bin/bun -b
 // Bun Native Messaging host
 // guest271314, 10-9-2022
-async function getMessage() {
-  const { promise, resolve } = Promise.withResolvers();
-  // https://github.com/simov/native-messaging/blob/8e99d2a345ae94426a502d05aa5d57b966f6bc78/protocol.js
-  let messageLength = 0,
-    bytesWritten = 0,
-    input = [];
 
-  process.stdin.on("readable", () => {
-    let chunk;
-    while ((chunk = process.stdin.read())) {
-      // Set message value length once
-      if (messageLength === 0) {
-        [messageLength] = new Uint32Array(chunk.buffer.slice(0, 4));
-        chunk = chunk.subarray(4);
+const buffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 * 64 });
+const view = new DataView(buffer);
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+const maxMessageLengthFromHost = 209715;
+const readable = Bun.stdin.stream();
+const writable = new WritableStream({
+  async write(value) {
+    const fileSink = Bun.stdout.writer({ highWaterMark: Infinity });
+    fileSink.start({ highWaterMark: Infinity });
+    const n0 = fileSink.write(value);
+    const n1 = await fileSink.flush();
+    const n2 = await fileSink.end();
+  }
+});
+const { exit } = process;
+const writer = writable.getWriter();
+function encodeMessage(message) {
+  return encoder.encode(JSON.stringify(message));
+}
+async function* getMessage() {
+  let messageLength = 0;
+  let readOffset = 0;
+  for await (let message of readable) {
+    if (buffer.byteLength === 0 && messageLength === 0) {
+      buffer.resize(4);
+      for (let i = 0; i < 4; i++) {
+        view.setUint8(i, message[i]);
       }
-      // Store accrued message length read
-      bytesWritten += chunk.length;
-      input.push(...chunk);
-      if (bytesWritten === messageLength) {
-        // Send accrued message from client back to client
-        resolve(new Uint8Array(input));
-      }
+      messageLength = view.getUint32(0, true);
+      message = message.subarray(4);
+      buffer.resize(0);
     }
-  });
-
-  return await promise;
-}
-
-function sendMessage(json) {
-  // https://github.com/denoland/deno/discussions/17236#discussioncomment-4566134
-  const header = new Uint32Array([json.length]);
-  /*
-  // Long form
-  const header = new Uint32Array([
-    ((uint32) =>     
-      // https://stackoverflow.com/a/58288413
-      (uint32[3] << 24) 
-      | (uint32[2] << 16) 
-      | (uint32[1] << 8) 
-      | (uint32[0])
-      )(Array.from({
-        length: 4,
-      }, (_,index)=>(json.length >> (index * 8)) & 0xff)
-    )
-  ]);
-  */
-  process.stdout.write(new Uint8Array(header.buffer));
-  process.stdout.write(json);
-  Bun.gc(true);
-}
-
-async function main() {
-  while (true) {
-    try {
-      const message = await getMessage();
-      sendMessage(message);
-    } catch (e) {
-      process.exit();
+    buffer.resize(buffer.byteLength + message.length);
+    for (let i = 0; i < message.length; i++, readOffset++) {
+      view.setUint8(readOffset, message[i]);
+    }
+    if (buffer.byteLength === messageLength) {
+      yield new Uint8Array(buffer);
+      messageLength = 0;
+      readOffset = 0;
+      buffer.resize(0);
     }
   }
 }
-
-main();
+async function sendMessage(message) {
+  const json = JSON.parse(decoder.decode(message));
+  if (Array.isArray(json) && json.length > maxMessageLengthFromHost) {
+    for (let i = 0; i < json.length; i += maxMessageLengthFromHost) {
+      const messageChunk = encodeMessage(
+        json.slice(i, i + maxMessageLengthFromHost)
+      );
+      const u8 = new Uint8Array(4 + messageChunk.length);
+      u8.set(new Uint8Array(new Uint32Array([messageChunk.length]).buffer), 0);
+      u8.set(messageChunk, 4);
+      await writer.write(u8);
+      await writer.ready;
+    }
+  } else {
+    const encoded = encodeMessage(json);
+    const u8 = new Uint8Array(4 + encoded.length);
+    u8.set(new Uint8Array(new Uint32Array([encoded.length]).buffer), 0);
+    u8.set(encoded, 4);
+    return await writer.write(u8);
+    await writer.ready;
+  }
+}
+try {
+  for await (const message of getMessage()) {
+    await sendMessage(message);
+  }
+} catch (e) {
+  sendMessage(encodeMessage(e.message));
+  exit();
+}
+export {
+  encodeMessage,
+  exit,
+  getMessage,
+  readable,
+  sendMessage,
+  writable
+};
