@@ -95,8 +95,8 @@ async function sendMessage(message) {
   const json = JSON.parse(decoder.decode(message));
   if (Array.isArray(json) && json.length > maxMessageLengthFromHost) {
     for (let i = 0; i < json.length; i += maxMessageLengthFromHost) {
-      const messageChunk = encoder.encode(
-        JSON.stringify(json.slice(i, i + maxMessageLengthFromHost)),
+      const messageChunk = encodeMessage(
+        json.slice(i, i + maxMessageLengthFromHost),
       );
       const u8 = new Uint8Array(4 + messageChunk.length);
       u8.set(new Uint8Array(new Uint32Array([messageChunk.length]).buffer), 0);
