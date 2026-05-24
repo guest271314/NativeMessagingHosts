@@ -5,15 +5,13 @@
 
 const [path, allowed_origin] = Deno.args;
 
-console.log({ path, allowed_origin });
-
 const command = new Deno.Command(path, {
   args: [allowed_origin],
   stdout: "piped",
   stdin: "piped",
 });
 
-console.log(`\u001b[32mTesting ${path} Native Messaging host\u001b[0m\r\n`);
+console.log(`\u001b[32mTesting ${path} Native Messaging host, allowed_origin: ${allowed_origin}\u001b[0m\r\n`);
 
 const subprocess = command.spawn();
 const buffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 });
