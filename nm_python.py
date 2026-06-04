@@ -1,11 +1,11 @@
 #!/usr/bin/env -S python3 -u
+# Python Native Messaging host
+# guest271314, 1-9-2026
 # https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_messaging
 # https://github.com/mdn/webextensions-examples/pull/157
 # Note that running python with the `-u` flag is required on Windows,
 # in order to ensure that stdin and stdout are opened in binary, rather
 # than text, mode.
-# Python Native Messaging host
-# guest271314, 1-9-2026
 # https://discuss.python.org/t/how-to-support-optimized-64-mib-json-parsing-and-streaming-for-native-messaging-host/105567/9
 # https://github.com/guest271314/NativeMessagingHosts/blob/main/nm_nodejs.js
 # https://www.codeconvert.ai/javascript-to-python-converter?id=53a74277-8ee6-4f73-9c22-cb65296481ca
@@ -120,4 +120,9 @@ async def getMessage():
 try:
     asyncio.run(getMessage())
 except Exception:
-    sys.exit(1)
+    sys.stdout.buffer.flush()
+    sys.stdin.buffer.flush()
+    # https://discuss.python.org/t/how-to-read-1mb-of-input-from-stdin/22534/14
+    with open('nm_python.log', 'w', encoding='utf-8') as f:
+        traceback.print_exc(file=f)
+    sys.exit(0)
