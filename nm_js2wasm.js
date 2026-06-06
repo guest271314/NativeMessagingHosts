@@ -1,5 +1,5 @@
 // js2wasm Native Messaging host
-// 6-5-2026
+// guest271314, ttraenkler, 6-5-2026
 // https://github.com/loopdive/js2/issues/389
 // bun build ./node_modules/@loopdive/js2/examples/native-messaging/nm_js2wasm.ts --target=node --outfile=nm_js2wasm.js
 // node_modules/@loopdive/js2/examples/native-messaging/nm_js2wasm.ts
