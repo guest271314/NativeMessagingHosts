@@ -2,114 +2,124 @@
 // Zig Native Messaging host
 // guest271314, 3-20-2026
 // Source: QuickJS Native Messaging host https://github.com/guest271314/native-messaging-quickjs/nm_qjs.js
-// Zig 0.15.2
-// zig-stable build-exe nm_zig_stable.zig -O ReleaseSmall
-// zig-stable build-exe nm_zig_stable.zig -target wasm32-wasi -O ReleaseSmall
-// https://share.google/aimode/bNhlhxmpTRRvfqFQC
+// Zig 0.16.0
+// zig build-exe nm_zig_stable.zig -O ReleaseSmall
+// zig build-exe nm_zig_stable.zig -target wasm32-wasi -O ReleaseSmall
 
 const std = @import("std");
 
-const CHUNK_SIZE = 1024 * 1024; // 1 MiB
-const COMMA = 44;
-const OPEN_BRACKET = 91;
-const CLOSE_BRACKET = 93;
+const CHUNK_SIZE = 1024 * 1024;
 
-pub fn main() !void {
-  var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-  defer _ = gpa.deinit();
-  const allocator = gpa.allocator();
+/// Zig 0.16.0 main entry point structure
+pub fn main(init: std.process.Init) !void {
+  const allocator = init.gpa;
+  const io = init.io;
 
   while (true) {
-    // Read the full message (up to 64 MiB)
-    const message = getMessage(allocator) catch |err| {
+    const message = getMessage(allocator, io) catch |err| {
       if (err == error.EndOfStream) break;
       return err;
     };
-    defer allocator.free(message);
 
-    // Process and send back in 1 MiB chunks
-    if (message.len <= CHUNK_SIZE) {
-      try sendMessage(message);
-    } else {
-      var index: usize = 0;
-      while (index < message.len) {
-        var split_index: usize = index + CHUNK_SIZE - 8;
-
-        if (split_index >= message.len) {
-          split_index = message.len;
-        } else {
-          // Find next safe comma to split JSON array
-          if (std.mem.indexOfScalarPos(u8, message, split_index, COMMA)) |pos| {
-            split_index = pos;
-          } else {
-            split_index = message.len;
-          }
-        }
-
-        const raw_chunk = message[index..split_index];
-        if (raw_chunk.len == 0) break;
-
-        const start_byte = raw_chunk[0];
-        const end_byte = raw_chunk[raw_chunk.len - 1];
-
-        const needs_open = (start_byte == COMMA);
-        const needs_close = (end_byte != CLOSE_BRACKET);
-        const body_src_offset: usize = if (needs_open) 1 else 0;
-        const body_len = raw_chunk.len - body_src_offset;
-
-        // Calculate size for the chunk: Body + Brackets
-        const total_payload_len = body_len +
-          (if (needs_open or (index == 0 and start_byte != OPEN_BRACKET)) @as(usize, 1) else @as(usize, 0)) +
-          (if (needs_close) @as(usize, 1) else @as(usize, 0));
-
-        const out_buf = try allocator.alloc(u8, total_payload_len);
-        defer allocator.free(out_buf);
-
-        var cursor: usize = 0;
-        if (needs_open or (index == 0 and start_byte != OPEN_BRACKET)) {
-          out_buf[cursor] = OPEN_BRACKET;
-          cursor += 1;
-        }
-
-        @memcpy(out_buf[cursor .. cursor + body_len], raw_chunk[body_src_offset..]);
-        cursor += body_len;
-
-        if (needs_close) {
-          out_buf[cursor] = CLOSE_BRACKET;
-        }
-
-        try sendMessage(out_buf);
-        index = split_index;
-      }
-    }
+    try sendMessage(message, allocator, io);
   }
 }
 
-pub fn getMessage(allocator: std.mem.Allocator) ![]u8 {
-  const stdin = std.fs.File.stdin();
+/// Read STDIN from browser
+pub fn getMessage(allocator: std.mem.Allocator, io: std.Io) ![]u8 {
+  const stdin = std.Io.File.stdin();
 
-  // Read 4-byte header
+  // Explicit 4-byte explicit array block type declaration
   var h_buf: [4]u8 = undefined;
-  const h_read = try stdin.readAll(&h_buf);
-  if (h_read < 4) return error.EndOfStream;
+
+  // Instantiate reader interface passing an ephemeral stack buffer array workspace
+  var file_buffer: [4096]u8 = undefined;
+  var file_reader = stdin.reader(io, &file_buffer);
+
+  const header_slice = try file_reader.interface.takeArray(4);
+  @memcpy(&h_buf, header_slice);
 
   const msg_len = std.mem.readInt(u32, &h_buf, .little);
-  const buf = try allocator.alloc(u8, msg_len);
-  errdefer allocator.free(buf);
 
-  // Fill buffer exactly
-  _ = try stdin.readAll(buf);
-  return buf;
+  // Initialize standard memory accumulating stream writer
+  var target_list = std.Io.Writer.Allocating.init(allocator);
+  defer target_list.deinit();
+  const writer_interface = &target_list.writer;
+
+  var total_read: usize = 0;
+  while (total_read < msg_len) {
+    const needed = msg_len - total_read;
+    const to_read = @min(needed, file_buffer.len);
+
+    const chunk = try file_reader.interface.take(to_read);
+    if (chunk.len == 0) return error.EndOfStream;
+
+    try writer_interface.writeAll(chunk);
+    total_read += chunk.len;
+  }
+
+  const written_data = target_list.written();
+  const final_buf = try allocator.alloc(u8, written_data.len);
+  @memcpy(final_buf, written_data);
+  return final_buf;
 }
 
-pub fn sendMessage(message: []const u8) !void {
-  const stdout = std.fs.File.stdout();
+/// Write to STDOUT to browser
+pub fn sendMessage(message: []const u8, allocator: std.mem.Allocator, io: std.Io) !void {
+  const stdout = std.Io.File.stdout();
 
-  // Native Messaging: 4-byte little-endian length prefix
-  var h_buf: [4]u8 = undefined;
-  std.mem.writeInt(u32, &h_buf, @intCast(message.len), .little);
+  if (message.len <= CHUNK_SIZE) {
+    var h_buf: [4]u8 = undefined;
+    std.mem.writeInt(u32, &h_buf, @intCast(message.len), .little);
 
-  // Raw writeAll ensures the header and message are sent to the OS immediately
-  try stdout.writeAll(&h_buf);
-  try stdout.writeAll(message);
+    // FIX 1: Write raw headers and data directly to stdout using unbuffered writeStreamingAll
+    try stdout.writeStreamingAll(io, &h_buf);
+    try stdout.writeStreamingAll(io, message);
+    return;
+  }
+
+  var index: usize = 0;
+  while (index < message.len) {
+    var split_index = index + CHUNK_SIZE - 8;
+    if (split_index >= message.len) {
+      split_index = message.len;
+    } else {
+      if (std.mem.indexOfScalarPos(u8, message, split_index, ',')) |pos| {
+        split_index = pos;
+      } else {
+        split_index = message.len;
+      }
+    }
+
+    const raw_chunk = message[index..split_index];
+    const starts_with_comma = raw_chunk.len > 0 and raw_chunk[0] == ',';
+    const ends_with_bracket = raw_chunk.len > 0 and raw_chunk[raw_chunk.len - 1] == ']';
+
+    var chunk_buf = try allocator.alloc(u8, raw_chunk.len + 2);
+    defer allocator.free(chunk_buf);
+
+    var cursor: usize = 0;
+    if (starts_with_comma) {
+      chunk_buf[0] = '[';
+      @memcpy(chunk_buf[1..raw_chunk.len], raw_chunk[1..]);
+      cursor = raw_chunk.len;
+    } else {
+      @memcpy(chunk_buf[0..raw_chunk.len], raw_chunk);
+      cursor = raw_chunk.len;
+    }
+
+    if (!ends_with_bracket) {
+      chunk_buf[cursor] = ']';
+      cursor += 1;
+    }
+
+    var h_buf: [4]u8 = undefined;
+    std.mem.writeInt(u32, &h_buf, @intCast(cursor), .little);
+
+    // FIX 2: Stream the dynamic chunk blocks unbuffered straight over the pipe descriptor boundary
+    try stdout.writeStreamingAll(io, &h_buf);
+    try stdout.writeStreamingAll(io, chunk_buf[0..cursor]);
+
+    index = split_index;
+  }
 }
