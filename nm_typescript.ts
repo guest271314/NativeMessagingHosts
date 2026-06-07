@@ -3,7 +3,6 @@
 //! 
 //! #!/usr/bin/env -S /home/user/bin/bun -b --expose-gc
 //! #!/usr/bin/env -S /home/user/bin/deno -A --v8-flags="--expose-gc"
-//! #!/usr/bin/env -S /home/user/bin/bun -b --expose-gc
 //! #!/usr/bin/env -S /home/user/bin/node --expose-gc
 //!
 //! Source JavaScript: https://github.com/guest271314/NativeMessagingHosts/blob/main/nm_host.js
@@ -16,9 +15,15 @@ declare function gc(): void;
 const stdin: NodeJS.ReadStream & { fd: 0 } = process.stdin;
 const stdout: NodeJS.WriteStream & { fd: 1 } = process.stdout;
 const exit: (n: number) => void = process.exit;
+
+// Cast stdout to 'any' briefly to access internal _handle, or use a type guard
+// (stdin as any)?._handle?.setBlocking?.(true);
+// (stdout as any)?._handle?.setBlocking?.(true);
+
 const buffer: ArrayBuffer = new ArrayBuffer(0, {
   maxByteLength: 1024 ** 2 * 64,
 });
+
 const encoder: TextEncoder = new TextEncoder();
 let totalMessageLength: number = 0;
 let currentMessageLength: number = 0;
@@ -29,7 +34,8 @@ function encodeMessage(message: object): Uint8Array<ArrayBuffer> {
 
 async function* getMessage(): AsyncGenerator<Uint8Array<ArrayBuffer>> {
   for await (const data of stdin) {
-    const chunk: Uint8Array<ArrayBuffer> = data;
+    const chunk: Uint8Array<ArrayBuffer> = data; 
+    if (
       buffer.byteLength === 0 && totalMessageLength === 0 &&
       currentMessageLength === 0
     ) {
