@@ -1,125 +1,89 @@
 //usr/bin/env -S /home/user/bin/zig run "$0"
 // Zig Native Messaging host
-// guest271314, 3-20-2026
-// Source: QuickJS Native Messaging host https://github.com/guest271314/native-messaging-quickjs/nm_qjs.js
+// guest271314, TerenceTux (https://ziggit.dev/u/terencetux) 2-14-2026, 6-13-2026
+// Source: QuickJS Native Messaging host https://github.com/guest271314/NativeMessagingHosts/blob/main/nm_qjs_64.js
 // Zig 0.16.0
 // zig build-exe nm_zig_stable.zig -O ReleaseSmall
 // zig build-exe nm_zig_stable.zig -target wasm32-wasi -O ReleaseSmall
 
 const std = @import("std");
 
-const CHUNK_SIZE = 1024 * 1024;
-
-/// Zig 0.16.0 main entry point structure
-pub fn main(init: std.process.Init) !void {
-  const allocator = init.gpa;
-  const io = init.io;
-
-  while (true) {
-    const message = getMessage(allocator, io) catch |err| {
-      if (err == error.EndOfStream) break;
-      return err;
-    };
-
-    try sendMessage(message, allocator, io);
-  }
+fn getMessage(reader: *std.Io.Reader, alloc: std.mem.Allocator) ![]u8 {
+  const header = try reader.takeInt(u32, .native);
+  const output = try alloc.alloc(u8, header);
+  errdefer alloc.free(output);
+  try reader.readSliceAll(output);
+  return output;
 }
 
-/// Read STDIN from browser
-pub fn getMessage(allocator: std.mem.Allocator, io: std.Io) ![]u8 {
-  const stdin = std.Io.File.stdin();
+fn sendMessage(writer: *std.Io.Writer, message: []const u8) !void {
+  if (message.len > 1024 * 1024) {
+    var from_index: usize = 1024 * 1024 - 8;
+    var index: usize = 0;
 
-  // Explicit 4-byte explicit array block type declaration
-  var h_buf: [4]u8 = undefined;
+    while (index < message.len) {
+      const i = std.mem.findScalarPos(u8, message, from_index, ',') orelse message.len;
+      var part = message[index..i];
+      index = i;
+      from_index += 1024 * 1024 - 8;
 
-  // Instantiate reader interface passing an ephemeral stack buffer array workspace
-  var file_buffer: [4096]u8 = undefined;
-  var file_reader = stdin.reader(io, &file_buffer);
+      const start = part[0];
+      const end = part[part.len - 1];
 
-  const header_slice = try file_reader.interface.takeArray(4);
-  @memcpy(&h_buf, header_slice);
+      var append: ?u8 = null;
+      var prepend: ?u8 = null;
 
-  const msg_len = std.mem.readInt(u32, &h_buf, .little);
+      if (start == '[' and end != ',' and end != ']') {
+        append = ']';
+      } else if (start == ',' and end != ']') {
+        part = part[1..];
+        prepend = '[';
+        append = ']';
+      } else if (start == ',' and end == ']') {
+        part = part[1..];
+        prepend = '[';
+      }
 
-  // Initialize standard memory accumulating stream writer
-  var target_list = std.Io.Writer.Allocating.init(allocator);
-  defer target_list.deinit();
-  const writer_interface = &target_list.writer;
+      var length: usize = part.len;
+      if (prepend != null) {
+        length += 1;
+      }
+      if (append != null) {
+        length += 1;
+      }
 
-  var total_read: usize = 0;
-  while (total_read < msg_len) {
-    const needed = msg_len - total_read;
-    const to_read = @min(needed, file_buffer.len);
+      try writer.writeInt(u32, @intCast(length), .native);
 
-    const chunk = try file_reader.interface.take(to_read);
-    if (chunk.len == 0) return error.EndOfStream;
-
-    try writer_interface.writeAll(chunk);
-    total_read += chunk.len;
-  }
-
-  const written_data = target_list.written();
-  const final_buf = try allocator.alloc(u8, written_data.len);
-  @memcpy(final_buf, written_data);
-  return final_buf;
-}
-
-/// Write to STDOUT to browser
-pub fn sendMessage(message: []const u8, allocator: std.mem.Allocator, io: std.Io) !void {
-  const stdout = std.Io.File.stdout();
-
-  if (message.len <= CHUNK_SIZE) {
-    var h_buf: [4]u8 = undefined;
-    std.mem.writeInt(u32, &h_buf, @intCast(message.len), .little);
-
-    // FIX 1: Write raw headers and data directly to stdout using unbuffered writeStreamingAll
-    try stdout.writeStreamingAll(io, &h_buf);
-    try stdout.writeStreamingAll(io, message);
-    return;
-  }
-
-  var index: usize = 0;
-  while (index < message.len) {
-    var split_index = index + CHUNK_SIZE - 8;
-    if (split_index >= message.len) {
-      split_index = message.len;
-    } else {
-      if (std.mem.indexOfScalarPos(u8, message, split_index, ',')) |pos| {
-        split_index = pos;
-      } else {
-        split_index = message.len;
+      if (prepend) |char| {
+        try writer.writeByte(char);
+      }
+      try writer.writeAll(part);
+      if (append) |char| {
+        try writer.writeByte(char);
       }
     }
+  } else {
+    try writer.writeInt(u32, @intCast(message.len), .native);
+    try writer.writeAll(message);
+  }
+  try writer.flush();
+}
 
-    const raw_chunk = message[index..split_index];
-    const starts_with_comma = raw_chunk.len > 0 and raw_chunk[0] == ',';
-    const ends_with_bracket = raw_chunk.len > 0 and raw_chunk[raw_chunk.len - 1] == ']';
+pub fn main(init: std.process.Init) !void {
+  const alloc = init.gpa;
+  const io = init.io;
 
-    var chunk_buf = try allocator.alloc(u8, raw_chunk.len + 2);
-    defer allocator.free(chunk_buf);
+  const stdin = std.Io.File.stdin();
+  var stdin_buffer: [4096]u8 = undefined;
+  var stdin_reader = stdin.reader(io, &stdin_buffer);
 
-    var cursor: usize = 0;
-    if (starts_with_comma) {
-      chunk_buf[0] = '[';
-      @memcpy(chunk_buf[1..raw_chunk.len], raw_chunk[1..]);
-      cursor = raw_chunk.len;
-    } else {
-      @memcpy(chunk_buf[0..raw_chunk.len], raw_chunk);
-      cursor = raw_chunk.len;
-    }
+  const stdout = std.Io.File.stdout();
+  var stdout_buffer: [4096]u8 = undefined;
+  var stdout_writer = stdout.writer(io, &stdout_buffer);
 
-    if (!ends_with_bracket) {
-      chunk_buf[cursor] = ']';
-      cursor += 1;
-    }
-
-    var h_buf: [4]u8 = undefined;
-    std.mem.writeInt(u32, &h_buf, @intCast(cursor), .little);
-
-    // FIX 2: Stream the dynamic chunk blocks unbuffered straight over the pipe descriptor boundary
-    try stdout.writeStreamingAll(io, &h_buf);
-    try stdout.writeStreamingAll(io, chunk_buf[0..cursor]);
-
-    index = split_index;
+  while (true) {
+    const message = try getMessage(&stdin_reader.interface, alloc);
+    defer alloc.free(message);
+    try sendMessage(&stdout_writer.interface, message);
   }
 }
