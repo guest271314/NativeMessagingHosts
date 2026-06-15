@@ -2,6 +2,13 @@
 // https://github.com/guest271314/NativeMessagingHosts/discussions/2
 // deno -A nm_standalone_test.js /home/user/native-messaging-rust/nm_rust.rs \
 //   native-messaging-extension://xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/
+//
+// The hosts cap each *outbound* frame at 1 MiB (the host->extension Native
+// Messaging limit) and split a larger response into several sub-1-MiB
+// JSON-array fragments at comma boundaries, so one logical message arrives as N
+// length-prefixed transport frames. getMessage() therefore treats `buffer` as a
+// rolling byte queue (resizable ArrayBuffer, decoupled from stdout read
+// boundaries) and echoNativeMessage() reassembles the fragments.
 
 const [path, allowed_origin] = Deno.args;
 
@@ -11,11 +18,16 @@ const command = new Deno.Command(path, {
   stdin: "piped",
 });
 
-console.log(`\u001b[32mTesting ${path} Native Messaging host, allowed_origin: ${allowed_origin}\u001b[0m\r\n`);
+console.log(
+  `\u001b[32mTesting ${path} Native Messaging host, allowed_origin: ${allowed_origin}\u001b[0m\r\n`,
+);
 
 const subprocess = command.spawn();
-const buffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 });
-const view = new DataView(buffer);
+// Rolling queue. maxByteLength covers a full 64 MiB single-frame response
+// (Chrome's extension->host maximum); the chunked hosts stay well under it.
+const buffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 * 64 });
+const bytes = new Uint8Array(buffer); // length-tracking view for bulk copies
+const view = new DataView(buffer); // length-tracking view for the length prefix
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -42,31 +54,34 @@ async function sendMessage(input, data = encodeMessage("\r\n\r\n")) {
   }
 }
 
+// Yields one decoded transport frame at a time. Handles a 4-byte length prefix
+// split across reads, several frames in one read, and a frame body split across
+// reads, by buffering bytes until each `[length][body]` frame is complete.
 async function* getMessage(readable) {
-  let messageLength = 0;
-  let readOffset = 0;
-  for await (let message of readable) {
-    if (buffer.byteLength === 0 && messageLength === 0) {
-      buffer.resize(4);
-      for (let i = 0; i < 4; i++) {
-        view.setUint8(i, message[i]);
+  let readOffset = 0; // bytes already consumed from the front of `buffer`
+  let messageLength = -1; // current frame body length; -1 = still need the prefix
+  for await (const chunk of readable) {
+    // Append this read to the rolling queue.
+    const base = buffer.byteLength;
+    buffer.resize(base + chunk.length);
+    bytes.set(chunk, base);
+    // Emit every complete frame the queue now holds.
+    for (;;) {
+      if (messageLength < 0) {
+        if (buffer.byteLength - readOffset < 4) break; // prefix incomplete
+        messageLength = view.getUint32(readOffset, true);
+        readOffset += 4;
       }
-      messageLength = view.getUint32(0, true);
-      console.log({ messageLength });
-      message = message.subarray(4);
-      buffer.resize(0);
+      if (buffer.byteLength - readOffset < messageLength) break; // body incomplete
+      yield bytes.slice(readOffset, readOffset + messageLength); // copy out
+      readOffset += messageLength;
+      messageLength = -1;
     }
-    if (message.length) {
-      buffer.resize(buffer.byteLength + message.length);
-      for (let i = 0; i < message.length; i++, readOffset++) {
-        view.setUint8(readOffset, message[i]);
-      }
-      if (buffer.byteLength === messageLength) {
-        yield new Uint8Array(buffer);
-        messageLength = 0;
-        readOffset = 0;
-        buffer.resize(0);
-      }
+    // Drop the consumed prefix; keep the unparsed tail at the front.
+    if (readOffset > 0) {
+      bytes.copyWithin(0, readOffset);
+      buffer.resize(buffer.byteLength - readOffset);
+      readOffset = 0;
     }
   }
 }
@@ -75,7 +90,7 @@ let controller = void 0;
 
 const readable = new ReadableStream({
   start(c) {
-    return controller = c;
+    return (controller = c);
   },
 });
 
@@ -84,14 +99,35 @@ const reader = readable.getReader();
 async function echoNativeMessage(input) {
   const data = encodeMessage(input);
   await sendMessage(data);
-  const { value, done } = await reader.read();
-  console.log(value);
+  // A response > ~1 MiB returns as several [..] fragments whose elements
+  // concatenate to the original array; everything else is a single frame.
+  if (Array.isArray(input)) {
+    const parts = [];
+    let length = 0;
+    do {
+      const { value } = await reader.read();
+      parts.push(value.message); // one parsed fragment array
+      length += value.message.length;
+    } while (length < input.length);
+    const message = parts.flat(); // spread-free: avoids push(...bigArray) overflow
+    console.log(
+      message.length === input.length ? `Array(${message.length})` : message,
+    );
+    return message;
+  }
+  const { value } = await reader.read();
+  console.log(value.message);
+  return value.message;
 }
 
 (async () => {
   try {
     for await (const message of getMessage(subprocess.stdout)) {
-      controller.enqueue({ message: JSON.parse(decoder.decode(message)) });
+      try {
+        controller.enqueue({ message: JSON.parse(decoder.decode(message)) });
+      } catch {
+        break; // stream closed after the last message; stop enqueuing
+      }
     }
   } catch (e) {
     console.log(e.message);
@@ -103,15 +139,14 @@ async function echoNativeMessage(input) {
 // for Array(209715), does print full test for Array(32768)
 
 try {
-  for (
-    const message of [
-      Array(209715),
-      "test",
-      "",
-      1,
-      new Uint8Array([97]),
-    ]
-  ) {
+  for (const message of [
+    Array(209715),
+    Array(209715 * 2), // > 1 MiB: exercises the multi-frame reassembly path
+    "test",
+    "",
+    1,
+    new Uint8Array([97]),
+  ]) {
     await echoNativeMessage(message);
   }
   controller.close();
