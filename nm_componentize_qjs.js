@@ -3,30 +3,33 @@
 //! https://github.com/andreiltd/issues/1
 //! Based on https://github.com/guest271314/native-messaging-webassembly/nm_javy.js
 
-import stdin from "wasi:cli/stdin@0.2.10";
-import stdout from "wasi:cli/stdout@0.2.10";
-import streams from "wasi:io/streams@0.2.10";
+import stdin from "wasi:cli/stdin@0.2.6";
+import stdout from "wasi:cli/stdout@0.2.6";
 
+const MAX_IN = 64 * 1024 * 1024;
 const WRITE_CHUNK = 4096;
 const FRAME = 1024 * 1024;
 const COMMA = 0x2c, OPEN = 0x5b, CLOSE = 0x5d;
-
-function unwrap(r) {
-  if (r.tag === "err") throw new Error("stream error");
-  return r.val;
-}
 
 function readExact(input, n) {
   const out = new Uint8Array(n);
   let off = 0;
   while (off < n) {
-    const r = streams.methodInputStreamBlockingRead(input, n - off);
-    if (r.tag === "err") {
-      if (r.val.tag === 1) return null;
-      throw new Error("read");
+    let chunk;
+    try {
+      chunk = input.blockingRead(n - off);
+    } catch (e) {
+      if (e && e.payload && e.payload.tag === "closed" && off === 0) {
+        return null;
+      }
+      throw e;
     }
-    out.set(r.val, off);
-    off += r.val.length;
+    if (chunk.length === 0) {
+      if (off === 0) return null;
+      throw new Error(`stdin closed after ${off} of ${n} bytes`);
+    }
+    out.set(chunk, off);
+    off += chunk.length;
   }
   return out;
 }
@@ -35,17 +38,13 @@ function readMessage(input) {
   const header = readExact(input, 4);
   if (header === null) return null;
   const len = new DataView(header.buffer).getUint32(0, true);
+  if (len > MAX_IN) throw new Error(`message of ${len} bytes exceeds 64 MiB`);
   return len === 0 ? new Uint8Array(0) : readExact(input, len);
 }
 
 function writeAll(output, data) {
   for (let off = 0; off < data.length; off += WRITE_CHUNK) {
-    unwrap(
-      streams.methodOutputStreamBlockingWriteAndFlush(
-        output,
-        data.subarray(off, off + WRITE_CHUNK),
-      ),
-    );
+    output.blockingWriteAndFlush(data.subarray(off, off + WRITE_CHUNK));
   }
 }
 
@@ -87,3 +86,4 @@ export const run = {
     return { tag: "ok" };
   },
 };
+
