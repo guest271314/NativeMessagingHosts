@@ -44,7 +44,8 @@ async function readNativeMessage() {
       }
       bytesRead += data.length;
       buffer.resize(buffer.byteLength + data.length);
-      new Uint8Array(buffer, offset++).set(data);
+      new Uint8Array(buffer, offset).set(data);
+      offset += data.length;
       if (bytesRead === messageLength) {
         subprocess.stdout.removeListener("readable", read);
         const json = JSON.parse(decoder.decode(new Uint8Array(buffer)));
