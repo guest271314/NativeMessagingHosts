@@ -1,4 +1,4 @@
-#!/usr/bin/env -S UV_THREADPOOL_SIZE=1 /home/user/bin/node --permission --allow-child-process --expose-gc --memory-saver-mode --v8-pool-size=1 --jitless --zero-unused-memory
+#!/usr/bin/env -S UV_THREADPOOL_SIZE=1 /home/user/bin/node --expose-gc --memory-saver-mode --v8-pool-size=1 --jitless --zero-unused-memory
 // How to test the different hosts #2
 // https://github.com/guest271314/NativeMessagingHosts/discussions/2
 // node nm_standalone_test_node.js /home/user/native-messaging-rust/nm_rust.rs \
