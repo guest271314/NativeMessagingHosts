@@ -1,3 +1,4 @@
+#!/usr/bin/env -S /home/user/bin/deno -A
 // How to test the different hosts #2
 // https://github.com/guest271314/NativeMessagingHosts/discussions/2
 // deno -A nm_standalone_test.js /home/user/native-messaging-rust/nm_rust.rs \
@@ -5,16 +6,18 @@
 
 const [path, allowed_origin] = Deno.args;
 
+console.log({ path, allowed_origin });
+
 const command = new Deno.Command(path, {
   args: [allowed_origin],
   stdout: "piped",
   stdin: "piped",
 });
 
-console.log(`\u001b[32mTesting ${path} Native Messaging host, allowed_origin: ${allowed_origin}\u001b[0m\r\n`);
+console.log(`\u001b[32mTesting ${path} Native Messaging host\u001b[0m\r\n`);
 
 const subprocess = command.spawn();
-const buffer = new ArrayBuffer(0, { maxByteLength: 1024 ** 2 });
+const buffer = new ArrayBuffer(0, { maxByteLength: (1024 ** 2 * 64) });
 const view = new DataView(buffer);
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -52,7 +55,11 @@ async function* getMessage(readable) {
         view.setUint8(i, message[i]);
       }
       messageLength = view.getUint32(0, true);
+      if (messageLength === 0) {
+        break;
+      }
       console.log({ messageLength });
+
       message = message.subarray(4);
       buffer.resize(0);
     }
@@ -61,7 +68,9 @@ async function* getMessage(readable) {
       for (let i = 0; i < message.length; i++, readOffset++) {
         view.setUint8(readOffset, message[i]);
       }
-      if (buffer.byteLength === messageLength) {
+
+      if (buffer.byteLength >= messageLength) {
+        console.log(buffer.byteLength, messageLength);
         yield new Uint8Array(buffer);
         messageLength = 0;
         readOffset = 0;
@@ -83,15 +92,36 @@ const reader = readable.getReader();
 
 async function echoNativeMessage(input) {
   const data = encodeMessage(input);
-  await sendMessage(data);
-  const { value, done } = await reader.read();
-  console.log(value);
+  if (Array.isArray(input) && input.length > 209715) {
+    const totalMessageLength = input.length;
+    await sendMessage(data);
+    let outputLength = 0;
+    while (outputLength < totalMessageLength) {
+      const { value, done } = await reader.read();
+      const json = value.message;
+      outputLength += json.length;
+      console.log({ outputLength, totalMessageLength });
+      if (outputLength >= totalMessageLength) {
+        break;
+      }
+    }
+    console.log({ totalMessageLength, outputLength });
+  } else {
+    await sendMessage(data);
+    const { value, done } = await reader.read();
+    console.log(value);
+  }
 }
 
 (async () => {
   try {
     for await (const message of getMessage(subprocess.stdout)) {
-      controller.enqueue({ message: JSON.parse(decoder.decode(message)) });
+      const decoded = decoder.decode(message);
+      const json = JSON.parse(decoded);
+      controller.enqueue({
+        message: json,
+        jsonLength: JSON.stringify(json).length,
+      });
     }
   } catch (e) {
     console.log(e.message);
@@ -99,17 +129,15 @@ async function echoNativeMessage(input) {
   }
 })();
 
-// SpiderMonkey throws ArrayBuffer.prototype.resize: Invalid length parameter
-// for Array(209715), does print full test for Array(32768)
-
 try {
   for (
-    const message of [
+    const message of [   
       Array(209715),
       "test",
       "",
       1,
       new Uint8Array([97]),
+      Array(209715 * 64),
     ]
   ) {
     await echoNativeMessage(message);
@@ -117,6 +145,7 @@ try {
   controller.close();
 } catch (e) {
   console.log(e.stack);
+  console.trace();
 } finally {
   subprocess.kill("SIGTERM");
 }
