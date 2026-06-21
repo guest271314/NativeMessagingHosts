@@ -17,8 +17,6 @@ const command = new Deno.Command(path, {
 console.log(`\u001b[32mTesting ${path} Native Messaging host\u001b[0m\r\n`);
 
 const subprocess = command.spawn();
-const buffer = new ArrayBuffer(0, { maxByteLength: (1024 ** 2 * 64) });
-const view = new DataView(buffer);
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -45,38 +43,45 @@ async function sendMessage(input, data = encodeMessage("\r\n\r\n")) {
   }
 }
 
+// Length-prefix deframer. A single OS read can straddle a frame boundary
+// (tail of frame N + the 4-byte header of frame N+1), so we must read EXACTLY
+// the declared number of bytes and carry any remainder to the next frame —
+// never accumulate past `messageLength`, or JSON.parse sees the next header
+// after `...]` and throws ("non-whitespace after JSON at position <len>").
 async function* getMessage(readable) {
-  let messageLength = 0;
-  let readOffset = 0;
-  for await (let message of readable) {
-    if (buffer.byteLength === 0 && messageLength === 0) {
-      buffer.resize(4);
-      for (let i = 0; i < 4; i++) {
-        view.setUint8(i, message[i]);
-      }
-      messageLength = view.getUint32(0, true);
-      if (messageLength === 0) {
-        break;
-      }
-      console.log({ messageLength });
+  const iterator = readable[Symbol.asyncIterator]();
+  let carry = new Uint8Array(0); // bytes already read that belong to a later frame
 
-      message = message.subarray(4);
-      buffer.resize(0);
+  // Resolve exactly `n` bytes from carry first, then the stream.
+  async function readExactly(n) {
+    while (carry.length < n) {
+      const { value, done } = await iterator.next();
+      if (done) return null;
+      const merged = new Uint8Array(carry.length + value.length);
+      merged.set(carry, 0);
+      merged.set(value, carry.length);
+      carry = merged;
     }
-    if (message.length) {
-      buffer.resize(buffer.byteLength + message.length);
-      for (let i = 0; i < message.length; i++, readOffset++) {
-        view.setUint8(readOffset, message[i]);
-      }
+    const out = carry.subarray(0, n);
+    carry = carry.subarray(n);
+    return out;
+  }
 
-      if (buffer.byteLength >= messageLength) {
-        console.log(buffer.byteLength, messageLength);
-        yield new Uint8Array(buffer);
-        messageLength = 0;
-        readOffset = 0;
-        buffer.resize(0);
-      }
-    }
+  for (;;) {
+    const header = await readExactly(4);
+    if (header === null) break;
+    const messageLength = new DataView(
+      header.buffer,
+      header.byteOffset,
+      4,
+    ).getUint32(0, true);
+    if (messageLength === 0) break;
+    console.log({ messageLength });
+
+    const body = await readExactly(messageLength);
+    if (body === null) break;
+    console.log(body.length, messageLength);
+    yield body;
   }
 }
 
@@ -84,7 +89,7 @@ let controller = void 0;
 
 const readable = new ReadableStream({
   start(c) {
-    return controller = c;
+    return (controller = c);
   },
 });
 
@@ -130,16 +135,14 @@ async function echoNativeMessage(input) {
 })();
 
 try {
-  for (
-    const message of [   
-      Array(209715),
-      "test",
-      "",
-      1,
-      new Uint8Array([97]),
-      Array(209715 * 64),
-    ]
-  ) {
+  for (const message of [
+    Array(209715),
+    "test",
+    "",
+    1,
+    new Uint8Array([97]),
+    Array(209715 * 64),
+  ]) {
     await echoNativeMessage(message);
   }
   controller.close();
