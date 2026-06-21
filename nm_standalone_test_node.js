@@ -5,11 +5,9 @@
 //   native-messaging-extension://xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/
 
 import { spawn } from "node:child_process";
-
 const hostPath = process.argv.at(-1);
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
-
 const subprocess = spawn(hostPath, [], {
   stdio: ["pipe", "pipe", "pipe"],
 });
@@ -77,25 +75,29 @@ async function echoNativeMessage(input) {
   let outputLength = 0;
   data.set(header, 0);
   data.set(message, 4);
-  if (!subprocess.stdin.write(data)) {
-    await new Promise((resolve) => subprocess.stdin.once("drain", resolve));
-  }
-  while (true) {
-    const result = await readNativeMessage();
-    if (result === null) {
-      break;
-    }
-    console.log({ message: result });
-    if (Array.isArray(input) && inputLength > 209715) {
-      outputLength += result.length;
-      if (outputLength === inputLength) {
-        return { inputLength, outputLength };
+  //! Start async read before write
+  const reader = (async () => {
+    while (true) {
+      const result = await readNativeMessage();
+      if (result === null) break;
+      console.log({ message: result });
+      if (Array.isArray(input) && inputLength > 209715) {
+        outputLength += result.length;
+        if (outputLength === inputLength) {
+          return { inputLength, outputLength };
+        }
+      } else {
+        outputLength = JSON.stringify(result).length;
+        return { inputLength: JSON.stringify(input).length, outputLength };
       }
-    } else {
-      outputLength = JSON.stringify(result).length;
-      return { inputLength: JSON.stringify(input).length, outputLength };
     }
+  })();
+  if (!subprocess.stdin.write(data)) {
+    await new Promise((resolve) =>
+      subprocess.stdin.once("drain", resolve)
+    );
   }
+  return await reader;
 }
 
 try {

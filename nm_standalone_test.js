@@ -17,8 +17,6 @@ const command = new Deno.Command(path, {
 console.log(`\u001b[32mTesting ${path} Native Messaging host\u001b[0m\r\n`);
 
 const subprocess = command.spawn();
-const buffer = new ArrayBuffer(0, { maxByteLength: (1024 ** 2 * 64) });
-const view = new DataView(buffer);
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -47,34 +45,34 @@ async function sendMessage(input, data = encodeMessage("\r\n\r\n")) {
 
 async function* getMessage(readable) {
   let messageLength = 0;
-  let readOffset = 0;
-  for await (let message of readable) {
-    if (buffer.byteLength === 0 && messageLength === 0) {
-      buffer.resize(4);
-      for (let i = 0; i < 4; i++) {
-        view.setUint8(i, message[i]);
-      }
-      messageLength = view.getUint32(0, true);
+  let overflow = new Uint8Array(0);
+  for await (const data of readable) {
+    const buffer = new Uint8Array(overflow.length + data.length);
+    buffer.set(overflow, 0);
+    buffer.set(data, overflow.length);
+    overflow = buffer;
+
+    while (true) {
       if (messageLength === 0) {
-        break;
-      }
-      console.log({ messageLength });
+        if (overflow.length < 4) {
+          break;
+        }
+        const view = new DataView(overflow.buffer, overflow.byteOffset, 4);
+        messageLength = view.getUint32(0, true);
 
-      message = message.subarray(4);
-      buffer.resize(0);
-    }
-    if (message.length) {
-      buffer.resize(buffer.byteLength + message.length);
-      for (let i = 0; i < message.length; i++, readOffset++) {
-        view.setUint8(readOffset, message[i]);
+        if (messageLength === 0) {
+          return;
+        }
+        console.log({ messageLength });
+        overflow = overflow.subarray(4);
       }
-
-      if (buffer.byteLength >= messageLength) {
-        console.log(buffer.byteLength, messageLength);
-        yield new Uint8Array(buffer);
+      if (overflow.length >= messageLength) {
+        const message = overflow.subarray(0, messageLength);
+        yield message;
+        overflow = overflow.subarray(messageLength);
         messageLength = 0;
-        readOffset = 0;
-        buffer.resize(0);
+      } else {
+        break; 
       }
     }
   }
@@ -131,7 +129,7 @@ async function echoNativeMessage(input) {
 
 try {
   for (
-    const message of [   
+    const message of [
       Array(209715),
       "test",
       "",
