@@ -1,10 +1,10 @@
-use boa_engine::object::FunctionObjectBuilder;
 /// boa JavaScript engine https://github.com/boa-dev/boa
 /// Native Messaging host nm_boa.js
 /// Globals defined for I/O in ECMAScript: std.read(), std.write(), std.err()
 /// guest271314 9-23-2026
 
 /// cargo +nightly build --target wasm32-wasip3 -Zbuild-std=std,panic_abort
+use boa_engine::object::FunctionObjectBuilder;
 use boa_engine::object::builtins::{JsArrayBuffer, JsUint8Array};
 use boa_engine::{Context, JsObject, JsResult, JsValue, NativeFunction, Source, js_string};
 use std::io::{self, Read, Write};
