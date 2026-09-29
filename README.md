@@ -8,7 +8,7 @@
 - Node.js
 - Deno
 - Bun
-- WebAssembly/WAT/WASI (C, C++, AssemblyScript, Bytecode Alliance Javy, Rust, Zig, Go, loopdive/js2wasm, ComponentizeJS, componentize-qjs, D)
+- WebAssembly/WAT/WASI (C, C++, AssemblyScript, Bytecode Alliance Javy, Rust, Zig, Go, loopdive/js2wasm, ComponentizeJS, componentize-qjs, D, boa)
 - Bash
 - SpiderMonkey `js` shell
 - V8 `d8` shell
@@ -25,6 +25,7 @@
 - Ruby
 - PHP
 - D
+- boa
 
 Tested echoing `new Array(209715)` (1 MB in JSON format) from client to host. 
 
