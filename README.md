@@ -27,6 +27,7 @@
 - D
 - boa
 - rquickjs
+- deno_core
 
 Tested echoing `new Array(209715)` (1 MB in JSON format) from client to host. 
 
