@@ -50,7 +50,7 @@ fn write_stderr(message: &str) {
 
 fn main() -> JsResult<()> {
   // DIRECTLY REFERENCE THE JS FILE IN MAIN.RS
-  // let js_code = include_str!("index.js");
+  // let js_code = include_str!("nm_boa.js");
   let js_code = r#"
 // boa Native Messaging host
 // guest271314 9-21-2026
