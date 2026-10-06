@@ -9,6 +9,7 @@ function getMessage() {
   const len = std.in.read(output.buffer, 0, output.length);
   return output;
 }
+// 64 MiB processing implementation based on https://github.com/guest271314/NativeMessagingHosts/blob/main/nm_qjs_64.js
 // https://gist.github.com/guest271314/c88d281572aadb2cc6265e3e9eb09810
 function sendMessage(message) {
   // Constants for readability
