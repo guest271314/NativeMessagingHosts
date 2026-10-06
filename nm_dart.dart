@@ -1,5 +1,6 @@
 // Dart Native Messaging host
 // guest271314 10-4-2026
+// Implementation based on https://github.com/guest271314/NativeMessagingHosts/blob/main/nm_qjs_64.js
 //
 // dart compile exe nm_dart.dart -S debug_dart.txt -o nm_dart
 // WASM doesn't work right now... No WASI
