@@ -32,7 +32,24 @@
 - JZ
 - Kiesel
 
-Tested echoing `new Array(209715)` (1 MB in JSON format) from client to host. 
+Tested roundtripping
+
+```javascript
+  for (
+    const message of [
+      Array(209715), // 1 MiB
+      "test",
+      "",
+      1,
+      new Uint8Array([97]),
+      Array(209715 * 64), // 64 MiB
+    ]
+  ) {
+    await echoNativeMessage(message);
+  }
+```
+
+from client to host. 
 
 # Native messaging documentation
 - [Chrome Developers](https://developer.chrome.com/docs/extensions/mv3/nativeMessaging/)
