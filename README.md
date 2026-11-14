@@ -8,7 +8,7 @@
 - Node.js
 - Deno
 - Bun
-- WebAssembly/WAT/WASI (C, C++, AssemblyScript, Bytecode Alliance Javy, Rust, Zig, Go, loopdive/js2wasm, ComponentizeJS, componentize-qjs, D, boa, rquickjs, Static Hermes, JZ, scriptc, PerryTS/perry)
+- WebAssembly/WAT/WASI (C, C++, AssemblyScript, Bytecode Alliance Javy, Rust, Zig, Go, loopdive/js2wasm, ComponentizeJS, componentize-qjs, D, boa, rquickjs, Static Hermes, JZ, scriptc, PerryTS/perry, TypeScript Native Compiler)
 - Bash
 - SpiderMonkey `js` shell
 - V8 `d8` shell
@@ -33,6 +33,7 @@
 - Kiesel
 - scriptc
 - PerryTS/perry
+- TypeScript Native Compiler
 
 Tested roundtripping
 
