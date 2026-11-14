@@ -1,5 +1,5 @@
-// Static Hermes Native Messaging inline functions
-// guest271314 10-3-2016
+// Static Hermes Native Messaging host inline functions
+// guest271314 10-3-2026
 
 #ifndef NM_SHERMES_H
 #define NM_SHERMES_H
@@ -8,6 +8,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 #ifdef _WIN32
 #include <fcntl.h>
@@ -69,6 +73,48 @@ static inline void* c_null_ptr() {
 
 static inline int c_is_null(void* ptr) {
   return ptr == NULL ? 1 : 0;
+}
+
+static inline int c_read_fd(int fd, void* base, size_t offset, size_t len) {
+  uint8_t* p = (uint8_t*)base + offset;
+  for (;;) {
+#ifdef _WIN32
+    int n = _read(fd, p, (unsigned int)len);
+#else
+    ssize_t n = read(fd, p, len);
+#endif
+    if (n < 0 && errno == EINTR) continue;
+    return (int)n;
+  }
+}
+
+static inline int c_write_fd(int fd, void* base, size_t offset, size_t len) {
+  uint8_t* p = (uint8_t*)base + offset;
+  for (;;) {
+#ifdef _WIN32
+    int n = _write(fd, p, (unsigned int)len);
+#else
+    ssize_t n = write(fd, p, len);
+#endif
+    if (n < 0 && errno == EINTR) continue;
+    return (int)n;
+  }
+}
+
+static inline void c_copy(void* dst, size_t dst_off, void* src, size_t src_off, size_t n) {
+  memcpy((uint8_t*)dst + dst_off, (uint8_t*)src + src_off, n);
+}
+
+// Regions may overlap (the window shift in streamIncomingMessage), so this must be memmove.
+static inline void c_move(void* dst, size_t dst_off, void* src, size_t src_off, size_t n) {
+  memmove((uint8_t*)dst + dst_off, (uint8_t*)src + src_off, n);
+}
+
+// Index of the first `ch` in [start, end), or -1.
+static inline int c_index_of(void* base, size_t start, size_t end, int ch) {
+  if (start >= end) return -1;
+  uint8_t* p = (uint8_t*)memchr((uint8_t*)base + start, ch, end - start);
+  return p == NULL ? -1 : (int)(p - (uint8_t*)base);
 }
 
 extern int main(int argc, char** argv);
