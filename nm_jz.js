@@ -1,274 +1,233 @@
-// JZ Native Messaging host
-// guest271314 10-25-2026
-
-import { readSync, writeSync } from "fs";
-//! https://github.com/loopdive/js2/blob/main/examples/native-messaging/nm_js2wasm_sync_framing.ts
-const VERBATIM_WINDOW = 64 * 1024;
+//! jz Native Messaging host, synchronous streaming fs I/O (AOT experiment)
+//! guest271314 11-9-2026
+import { readSync, writeSync } from "node:fs";
+const STDIN_FD = 0;
+const STDOUT_FD = 1;
+const STDERR_FD = 2;
+const HEADER_SIZE = 4;
 const COMMA = 44;
 const OPEN_BRACKET = 91;
 const CLOSE_BRACKET = 93;
-const DQUOTE = 34;
-function decodeLength(header) {
-  return header[0] + header[1] * 256 + header[2] * 65536 + header[3] * 16777216;
-}
-function readFillExact(read, buf, start, n) {
-  let got = 0;
-  while (got < n) {
-    const tmp = new Uint8Array(n - got);
-    const r = read(tmp);
-    if (r === null || r <= 0)
-      return false;
-    let i = 0;
-    while (i < r) {
-      buf[start + got + i] = tmp[i];
-      i = i + 1;
-    }
-    got = got + r;
+const NO_BYTE = -1;
+const CHUNK_SIZE = 1024 * 1024;
+const STREAM_BUFFER_SIZE = CHUNK_SIZE * 2;
+const UTILITY_BUFFER_SIZE = 4096;
+
+class SystemIO {
+  static read(fd, view, offset, len) {
+    const res = readSync(fd, view, offset, len, null);
+    if (typeof res === "number")
+      return res;
+    return 0;
   }
-  return true;
-}
-function emitRun(write, src, start, runLen) {
-  const bodyLen = runLen + 2;
-  const out = new Uint8Array(4 + bodyLen);
-  out[0] = bodyLen & 255;
-  out[1] = bodyLen >> 8 & 255;
-  out[2] = bodyLen >> 16 & 255;
-  out[3] = bodyLen >> 24 & 255;
-  out[4] = OPEN_BRACKET;
-  let k = 0;
-  while (k < runLen) {
-    out[5 + k] = src[start + k];
-    k = k + 1;
-  }
-  out[4 + runLen + 1] = CLOSE_BRACKET;
-  write(out);
-}
-function emitStringRun(write, src, start, runLen) {
-  const bodyLen = runLen + 2;
-  const out = new Uint8Array(4 + bodyLen);
-  out[0] = bodyLen & 255;
-  out[1] = bodyLen >> 8 & 255;
-  out[2] = bodyLen >> 16 & 255;
-  out[3] = bodyLen >> 24 & 255;
-  out[4] = DQUOTE;
-  let k = 0;
-  while (k < runLen) {
-    out[5 + k] = src[start + k];
-    k = k + 1;
-  }
-  out[4 + runLen + 1] = DQUOTE;
-  write(out);
-}
-function streamLargeString(read, write, buf, interiorRemaining, maxRun) {
-  let remaining = interiorRemaining;
-  while (remaining > 0) {
-    let runLen = maxRun;
-    if (remaining < runLen)
-      runLen = remaining;
-    if (!readFillExact(read, buf, 0, runLen))
-      return false;
-    emitStringRun(write, buf, 0, runLen);
-    remaining = remaining - runLen;
-  }
-  return true;
-}
-function runVerbatim(read, write) {
-  const header = new Uint8Array(4);
-  while (true) {
-    if (!readFillExact(read, header, 0, 4))
-      return;
-    const declaredLen = decodeLength(header);
-    if (declaredLen === 0)
-      return;
-    write(header);
-    let remaining = declaredLen;
-    while (remaining > 0) {
-      let run = VERBATIM_WINDOW;
-      if (remaining < run)
-        run = remaining;
-      const chunk = new Uint8Array(run);
-      if (!readFillExact(read, chunk, 0, run))
-        return;
-      write(chunk);
-      remaining = remaining - run;
-    }
+  static write(fd, view, offset, len) {
+    const res = writeSync(fd, view, offset, len);
+    if (typeof res === "number")
+      return res;
+    return 0;
   }
 }
-function runRechunk(read, write, log, cap) {
-  const maxRun = cap - 2;
-  const header = new Uint8Array(4);
-  const one = new Uint8Array(1);
-  const buf = new Uint8Array(cap);
-  while (true) {
-    if (!readFillExact(read, header, 0, 4))
-      break;
-    const declaredLen = decodeLength(header);
-    if (declaredLen === 0)
-      break;
-    log(declaredLen);
-    if (declaredLen <= cap) {
-      const out = new Uint8Array(4 + declaredLen);
-      out[0] = declaredLen & 255;
-      out[1] = declaredLen >> 8 & 255;
-      out[2] = declaredLen >> 16 & 255;
-      out[3] = declaredLen >> 24 & 255;
-      if (!readFillExact(read, out, 4, declaredLen))
-        break;
-      write(out);
-      continue;
-    }
-    if (!readFillExact(read, one, 0, 1))
-      break;
-    if (one[0] === DQUOTE) {
-      if (!streamLargeString(read, write, buf, declaredLen - 2, maxRun))
-        break;
-      if (!readFillExact(read, one, 0, 1))
-        break;
-      continue;
-    }
-    let interiorRemaining = declaredLen - 2;
-    let fill = 0;
-    let truncated = false;
-    while (interiorRemaining > 0) {
-      const need = cap - fill;
-      if (interiorRemaining >= need) {
-        if (!readFillExact(read, buf, fill, need)) {
-          truncated = true;
-          break;
-        }
-        fill = cap;
-        interiorRemaining = interiorRemaining - need;
-        let last = maxRun;
-        while (last > 0 && buf[last - 1] !== COMMA)
-          last = last - 1;
-        let runLen;
-        let consumed;
-        if (last === 0) {
-          runLen = maxRun;
-          consumed = maxRun;
-        } else {
-          runLen = last - 1;
-          consumed = last;
-        }
-        emitRun(write, buf, 0, runLen);
-        const rem = fill - consumed;
-        let m = 0;
-        while (m < rem) {
-          buf[m] = buf[consumed + m];
-          m = m + 1;
-        }
-        fill = rem;
-      } else {
-        const tmp = new Uint8Array(interiorRemaining);
-        if (!readFillExact(read, tmp, 0, interiorRemaining)) {
-          truncated = true;
-          break;
-        }
-        let t = 0;
-        while (t < interiorRemaining) {
-          buf[fill + t] = tmp[t];
-          t = t + 1;
-        }
-        fill = fill + interiorRemaining;
-        interiorRemaining = 0;
-        let startPos = 0;
-        while (startPos < fill) {
-          let stop = startPos + maxRun;
-          if (stop >= fill) {
-            stop = fill;
-          } else {
-            let c = stop;
-            while (c > startPos && buf[c - 1] !== COMMA)
-              c = c - 1;
-            if (c > startPos)
-              stop = c - 1;
-          }
-          emitRun(write, buf, startPos, stop - startPos);
-          startPos = stop;
-          if (startPos < fill && buf[startPos] === COMMA)
-            startPos = startPos + 1;
-        }
-        fill = 0;
+
+class NativeHostPipeline {
+  body = new Uint8Array(STREAM_BUFFER_SIZE);
+  header = new Uint8Array(HEADER_SIZE);
+  out = new Uint8Array(HEADER_SIZE + STREAM_BUFFER_SIZE + 2);
+  util = new Uint8Array(UTILITY_BUFFER_SIZE);
+  readLengthFromHeader() {
+    const h = this.header;
+    const s0 = h[0];
+    const s1 = h[1];
+    const s2 = h[2];
+    const s3 = h[3];
+    return (s0 | s1 << 8 | s2 << 16 | s3 << 24) >>> 0;
+  }
+  writeBuffer(fd, u8, length) {
+    let offset = 0;
+    while (offset < length) {
+      const n = SystemIO.write(fd, u8, offset, length - offset);
+      if (n === 0)
+        throw new Error("write returned 0");
+      if (typeof n === "number") {
+        offset = offset + n;
       }
     }
-    if (truncated)
-      break;
-    if (!readFillExact(read, one, 0, 1))
-      break;
+  }
+  readExactBody(offset, length) {
+    let filled = 0;
+    const view = this.body;
+    while (filled < length) {
+      const n = SystemIO.read(STDIN_FD, view, offset + filled, length - filled);
+      if (n === 0)
+        throw new Error("stdin closed prematurely");
+      if (typeof n === "number") {
+        filled = filled + n;
+      }
+    }
+  }
+  emit(from, to, prepend, append) {
+    const bodyLength = to - from;
+    const payload = bodyLength + (prepend !== NO_BYTE ? 1 : 0) + (append !== NO_BYTE ? 1 : 0);
+    const total = HEADER_SIZE + payload;
+    const out = this.out;
+    const body = this.body;
+    out[0] = payload & 255;
+    out[1] = payload >> 8 & 255;
+    out[2] = payload >> 16 & 255;
+    out[3] = payload >> 24 & 255;
+    let cursor = HEADER_SIZE;
+    if (prepend !== NO_BYTE) {
+      out[cursor] = prepend;
+      cursor++;
+    }
+    let src = from;
+    for (let i = 0;i < bodyLength; i++) {
+      out[cursor] = body[src];
+      cursor++;
+      src++;
+    }
+    if (append !== NO_BYTE) {
+      out[cursor] = append;
+      cursor++;
+    }
+    this.writeBuffer(STDOUT_FD, out, total);
+  }
+  sendChunk(fromIndex, toIndex) {
+    const body = this.body;
+    const startByte = body[fromIndex];
+    const endByte = body[toIndex - 1];
+    let actualFrom = fromIndex;
+    let prepend = NO_BYTE;
+    let append = NO_BYTE;
+    if (startByte === OPEN_BRACKET && endByte !== CLOSE_BRACKET) {
+      append = CLOSE_BRACKET;
+    } else if (startByte === COMMA) {
+      actualFrom = fromIndex + 1;
+      prepend = OPEN_BRACKET;
+      if (endByte !== CLOSE_BRACKET) {
+        append = CLOSE_BRACKET;
+      }
+    }
+    this.emit(actualFrom, toIndex, prepend, append);
+  }
+  streamIncomingMessage(totalIncomingBytes) {
+    let remainingBytes = totalIncomingBytes;
+    let bufferPopulation = 0;
+    const body = this.body;
+    while (remainingBytes > 0 || bufferPopulation > 0) {
+      const spaceAvailable = STREAM_BUFFER_SIZE - bufferPopulation;
+      const amountToRead = spaceAvailable < remainingBytes ? spaceAvailable : remainingBytes;
+      if (amountToRead > 0) {
+        this.readExactBody(bufferPopulation, amountToRead);
+        if (typeof amountToRead === "number") {
+          bufferPopulation = bufferPopulation + amountToRead;
+          remainingBytes = remainingBytes - amountToRead;
+        }
+      }
+      if (bufferPopulation <= CHUNK_SIZE) {
+        if (remainingBytes === 0) {
+          if (bufferPopulation > 0) {
+            this.sendChunk(0, bufferPopulation);
+            bufferPopulation = 0;
+          }
+          break;
+        }
+        continue;
+      }
+      const chunkBacktrack = CHUNK_SIZE - 8;
+      const searchStart = chunkBacktrack < bufferPopulation ? chunkBacktrack : 0;
+      let foundComma = -1;
+      for (let i = searchStart;i < bufferPopulation; i++) {
+        if (body[i] === COMMA) {
+          foundComma = i;
+          break;
+        }
+      }
+      const splitIndex = foundComma !== -1 ? foundComma : CHUNK_SIZE;
+      this.sendChunk(0, splitIndex);
+      const remainingInWindow = bufferPopulation - splitIndex;
+      for (let i = 0;i < remainingInWindow; i++) {
+        body[i] = body[splitIndex + i];
+      }
+      bufferPopulation = remainingInWindow;
+    }
+  }
+  writeStringToUtilBuffer(str) {
+    const len = str.length;
+    const u = this.util;
+    for (let i = 0;i < len; i++) {
+      const cp = str.charCodeAt(i);
+      u[i] = cp;
+    }
+    return len;
+  }
+  writeManualErrorJson(msg) {
+    const u = this.util;
+    let cursor = 0;
+    u[cursor++] = 123;
+    u[cursor++] = 34;
+    u[cursor++] = 101;
+    u[cursor++] = 114;
+    u[cursor++] = 114;
+    u[cursor++] = 111;
+    u[cursor++] = 114;
+    u[cursor++] = 34;
+    u[cursor++] = 58;
+    u[cursor++] = 34;
+    const msgLen = msg.length;
+    for (let i = 0;i < msgLen; i++) {
+      const cp = msg.charCodeAt(i);
+      if (cp === 34 || cp === 92) {
+        u[cursor++] = 92;
+      }
+      u[cursor++] = cp;
+    }
+    u[cursor++] = 34;
+    u[cursor++] = 125;
+    return cursor;
+  }
+  handleCrash(msg) {
+    const len = this.writeManualErrorJson(msg);
+    this.writeBuffer(STDERR_FD, this.util, len);
+    const body = this.body;
+    const u = this.util;
+    for (let i = 0;i < len; i++) {
+      body[i] = u[i];
+    }
+    this.sendChunk(0, len);
+    process.exit(1);
+  }
+  mainProcessingLoop() {
+    const header = this.header;
+    for (;; ) {
+      let bytesRead = 0;
+      let filled = 0;
+      while (filled < HEADER_SIZE) {
+        const n = SystemIO.read(STDIN_FD, header, filled, HEADER_SIZE - filled);
+        if (n === 0) {
+          bytesRead = filled;
+          break;
+        }
+        if (typeof n === "number") {
+          filled = filled + n;
+        }
+        bytesRead = filled;
+      }
+      if (bytesRead === 0)
+        return 0;
+      if (bytesRead < HEADER_SIZE)
+        return 1;
+      const totalIncomingBytes = this.readLengthFromHeader();
+      this.streamIncomingMessage(totalIncomingBytes);
+    }
   }
 }
-function runNmHost(read, write, log, maxFrameSize) {
-  if (maxFrameSize > 0) {
-    runRechunk(read, write, log, maxFrameSize);
-  } else {
-    runVerbatim(read, write);
+function run() {
+  const pipeline = new NativeHostPipeline;
+  const initMessage = '"jz Native Messaging streaming host"';
+  const initLen = pipeline.writeStringToUtilBuffer(initMessage);
+  pipeline.writeBuffer(STDERR_FD, pipeline.util, initLen);
+  const statusCode = pipeline.mainProcessingLoop();
+  if (statusCode === 1) {
+    pipeline.handleCrash("stdin closed mid-header");
   }
-}
-//! https://github.com/loopdive/js2/blob/main/examples/native-messaging/nm_js2wasm_node_fs.ts
-function nodeFsRead(buf) {
-  return readSync(0, buf, 0, buf.length/* { offset: 0, length: buf.length } */);
-}
-function nodeFsWrite(buf) {
-  let n = 0;
-  while (n < buf.length) {
-    const w = writeSync(1, buf, n);
-    if (w <= 0)
-      return;
-    n = n + w;
-  }
-}
-function putAscii(out, pos, s) {
-  let i = 0;
-  while (i < s.length) {
-    out[pos + i] = s.charCodeAt(i);
-    i = i + 1;
-  }
-  return pos + s.length;
-}
-function putUint(out, pos, value) {
-  if (value === 0) {
-    out[pos] = 48;
-    return pos + 1;
-  }
-  let digits = 0;
-  let n = value;
-  while (n > 0) {
-    digits = digits + 1;
-    n = (n - n % 10) / 10;
-  }
-  let v = value;
-  let i = digits - 1;
-  while (i >= 0) {
-    out[pos + i] = 48 + v % 10;
-    v = (v - v % 10) / 10;
-    i = i - 1;
-  }
-  return pos + digits;
-}
-function nodeFsLog(declaredLen) {
-  const scratch = new Uint8Array(96);
-  let p = 0;
-  p = putAscii(scratch, p, "[host] received ");
-  p = putUint(scratch, p, 4 + declaredLen);
-  p = putAscii(scratch, p, " chars, declared body length ");
-  p = putUint(scratch, p, declaredLen);
-  scratch[p] = 10;
-  p = p + 1;
-  const bytes = new Uint8Array(p);
-  let k = 0;
-  while (k < p) {
-    bytes[k] = scratch[k];
-    k = k + 1;
-  }
-  let m = 0;
-  while (m < bytes.length) {
-    const w = writeSync(2, bytes, m);
-    if (w <= 0)
-      return;
-    m = m + w;
-  }
-}
-export function _start() {
-  const frameChunk = 1024 * 1024;
-  runNmHost(nodeFsRead, nodeFsWrite, nodeFsLog, frameChunk);
 }
