@@ -1,36 +1,43 @@
-// Static Hermes Native Messaging host
-// guest271314, 10-2-2035
+//! Static Hermes Native Messaging host
+//! guest271314, 10-2-2025
+
 "use strict";
 
 (function (exports) {
-  const CHUNK_SIZE = 1024 * 1024;
-  const SEARCH_WINDOW = 8;
+  const STDIN_FD: number = 0;
+  const STDOUT_FD: number = 1;
+  const STDERR_FD: number = 2;
+  const HEADER_SIZE: number = 4;
+  const COMMA: number = 44;
+  const OPEN_BRACKET: number = 91;
+  const CLOSE_BRACKET: number = 93;
+  const NO_BYTE: number = -1;
+
+  const CHUNK_SIZE: number = 1024 * 1024;
+  const STREAM_BUFFER_SIZE: number = CHUNK_SIZE * 2;
+  const UTILITY_BUFFER_SIZE: number = 4096;
 
   // --- FFI Bindings ---
-  const get_stdin = $SHBuiltin.extern_c(
+  const read_fd = $SHBuiltin.extern_c(
     { include: "nm_shermes.h" },
-    function get_c_stdin(): c_ptr {
+    function c_read_fd(
+      fd: c_int,
+      ptr: c_ptr,
+      offset: c_size_t,
+      len: c_size_t,
+    ): c_int {
       throw 0;
     },
   );
 
-  const get_stdout = $SHBuiltin.extern_c(
+  const write_fd = $SHBuiltin.extern_c(
     { include: "nm_shermes.h" },
-    function get_c_stdout(): c_ptr {
-      throw 0;
-    },
-  );
-
-  const read_uint32_le = $SHBuiltin.extern_c(
-    { include: "nm_shermes.h" },
-    function c_read_uint32_le(ptr: c_ptr): c_int {
-      throw 0;
-    },
-  );
-
-  const write_uint32_le = $SHBuiltin.extern_c(
-    { include: "nm_shermes.h" },
-    function c_write_uint32_le(ptr: c_ptr, val: c_int): void {
+    function c_write_fd(
+      fd: c_int,
+      ptr: c_ptr,
+      offset: c_size_t,
+      len: c_size_t,
+    ): c_int {
       throw 0;
     },
   );
@@ -49,79 +56,6 @@
     },
   );
 
-  const find_mem_char = $SHBuiltin.extern_c(
-    { include: "nm_shermes.h" },
-    function c_memchr(ptr: c_ptr, ch: c_int, out_len: c_size_t): c_ptr {
-      throw 0;
-    },
-  );
-
-  const ptr_add = $SHBuiltin.extern_c(
-    { include: "nm_shermes.h" },
-    function c_ptr_add(ptr: c_ptr, offset: c_size_t): c_ptr {
-      throw 0;
-    },
-  );
-
-  const ptr_diff = $SHBuiltin.extern_c(
-    { include: "nm_shermes.h" },
-    function c_ptr_diff(ptr1: c_ptr, ptr2: c_ptr): c_size_t {
-      throw 0;
-    },
-  );
-
-  const get_null_ptr = $SHBuiltin.extern_c(
-    { include: "nm_shermes.h" },
-    function c_null_ptr(): c_ptr {
-      throw 0;
-    },
-  );
-
-  const is_ptr_null = $SHBuiltin.extern_c(
-    { include: "nm_shermes.h" },
-    function c_is_null(ptr: c_ptr): c_int {
-      throw 0;
-    },
-  );
-
-  const c_fread = $SHBuiltin.extern_c(
-    { include: "stdio.h" },
-    function fread(
-      ptr: c_ptr,
-      size: c_size_t,
-      count: c_size_t,
-      stream: c_ptr,
-    ): c_size_t {
-      throw 0;
-    },
-  );
-
-  const c_fwrite = $SHBuiltin.extern_c(
-    { include: "stdio.h" },
-    function fwrite(
-      ptr: c_ptr,
-      size: c_size_t,
-      count: c_size_t,
-      stream: c_ptr,
-    ): c_size_t {
-      throw 0;
-    },
-  );
-
-  const c_fputc = $SHBuiltin.extern_c(
-    { include: "stdio.h" },
-    function fputc(ch: c_int, stream: c_ptr): c_int {
-      throw 0;
-    },
-  );
-
-  const c_fflush = $SHBuiltin.extern_c(
-    { include: "stdio.h" },
-    function fflush(stream: c_ptr): c_int {
-      throw 0;
-    },
-  );
-
   const c_malloc = $SHBuiltin.extern_c(
     { include: "stdlib.h" },
     function malloc(size: c_size_t): c_ptr {
@@ -129,155 +63,323 @@
     },
   );
 
-  const c_free = $SHBuiltin.extern_c(
+  const c_exit = $SHBuiltin.extern_c(
     { include: "stdlib.h" },
-    function free(ptr: c_ptr): void {
+    function exit(code: c_int): void {
+      throw 0;
+    },
+  );
+  // mem
+  const copy_bytes = $SHBuiltin.extern_c(
+    { include: "nm_shermes.h" },
+    function c_copy(
+      dst: c_ptr,
+      dst_off: c_size_t,
+      src: c_ptr,
+      src_off: c_size_t,
+      n: c_size_t,
+    ): void {
       throw 0;
     },
   );
 
-  // --- High-Performance Ingestion Engine ---
-  function getMessage(
-    stdinStream: c_ptr,
-    headerBuf: c_ptr,
-    outLengthBuf: c_ptr,
-  ): c_ptr {
-    let bytesReadHeader = c_fread(headerBuf, 1, 4, stdinStream);
-    if (bytesReadHeader !== 4) {
-      write_uint32_le(outLengthBuf, 0);
-      return get_null_ptr();
+  const move_bytes = $SHBuiltin.extern_c(
+    { include: "nm_shermes.h" },
+    function c_move(
+      dst: c_ptr,
+      dst_off: c_size_t,
+      src: c_ptr,
+      src_off: c_size_t,
+      n: c_size_t,
+    ): void {
+      throw 0;
+    },
+  );
+
+  const index_of = $SHBuiltin.extern_c(
+    { include: "nm_shermes.h" },
+    function c_index_of(
+      base: c_ptr,
+      start: c_size_t,
+      end: c_size_t,
+      ch: c_int,
+    ): c_int {
+      throw 0;
+    },
+  );
+
+  class SystemIO {
+    read(
+      fd: number,
+      view: c_ptr,
+      offset: number,
+      len: number,
+    ): number {
+      const res: number = read_fd(fd, view, offset, len);
+      return res;
     }
 
-    let messageLength = read_uint32_le(headerBuf);
-    if (messageLength === 0 || messageLength > (64 << 20)) {
-      write_uint32_le(outLengthBuf, 0);
-      return get_null_ptr();
+    write(
+      fd: number,
+      view: c_ptr,
+      offset: number,
+      len: number,
+    ): number {
+      const res: number = write_fd(fd, view, offset, len);
+      return res;
     }
-
-    let messageBuffer = c_malloc(messageLength + 1);
-    if (is_ptr_null(messageBuffer) === 1) {
-      write_uint32_le(outLengthBuf, 0);
-      return get_null_ptr();
-    }
-
-    let bytesReadPayload = c_fread(
-      messageBuffer,
-      1,
-      messageLength,
-      stdinStream,
-    );
-    if (bytesReadPayload !== messageLength) {
-      c_free(messageBuffer);
-      write_uint32_le(outLengthBuf, 0);
-      return get_null_ptr();
-    }
-
-    set_byte(messageBuffer, messageLength, 0);
-    write_uint32_le(outLengthBuf, messageLength);
-    return messageBuffer;
   }
 
-  // --- High-Performance Zero-Allocation Chunked Stream Transmitter ---
-  function sendMessage(
-    messagePtr: c_ptr,
-    length: number,
-    stdoutStream: c_ptr,
-    headerBuf: c_ptr,
-  ): void {
-    if (is_ptr_null(messagePtr) === 1 || length === 0) return;
+  class NativeHostPipeline {
+    io: SystemIO = new SystemIO();
+    body: c_ptr = c_malloc(STREAM_BUFFER_SIZE);
+    header: c_ptr = c_malloc(HEADER_SIZE);
+    out: c_ptr = c_malloc(HEADER_SIZE + STREAM_BUFFER_SIZE + 2);
+    util: c_ptr = c_malloc(UTILITY_BUFFER_SIZE);
 
-    if (length <= CHUNK_SIZE) {
-      write_uint32_le(headerBuf, length);
-      c_fwrite(headerBuf, 1, 4, stdoutStream);
-      c_fwrite(messagePtr, 1, length, stdoutStream);
-      c_fflush(stdoutStream);
-      return;
+    readLengthFromHeader(): number {
+      const h: c_ptr = this.header;
+      const s0: number = get_byte(h, 0);
+      const s1: number = get_byte(h, 1);
+      const s2: number = get_byte(h, 2);
+      const s3: number = get_byte(h, 3);
+      return ((s0 | (s1 << 8) | (s2 << 16) | (s3 << 24)) >>> 0);
     }
 
-    let index = 0;
-    while (index < length) {
-      let remaining = length - index;
-      let splitIndex = length;
+    writeBuffer(fd: number, u8: c_ptr, length: number): void {
+      let offset: number = 0;
+      while (offset < length) {
+        const n: number = this.io.write(fd, u8, offset, length - offset);
+        if (n <= 0) throw new Error("write returned 0");
+        offset = offset + n;
+      }
+    }
 
-      if (remaining > CHUNK_SIZE) {
-        let searchStartOffset = index + CHUNK_SIZE - SEARCH_WINDOW;
-        let searchPtr = ptr_add(messagePtr, searchStartOffset);
-        let searchLen = length - searchStartOffset;
+    readExactBody(offset: number, length: number): void {
+      let filled: number = 0;
+      const view: c_ptr = this.body;
+      while (filled < length) {
+        const n: number = this.io.read(
+          STDIN_FD,
+          view,
+          offset + filled,
+          length - filled,
+        );
+        if (n <= 0) throw new Error("stdin closed prematurely");
+        filled = filled + n;
+      }
+    }
 
-        let commaPtr = find_mem_char(searchPtr, 44, searchLen);
-        if (is_ptr_null(commaPtr) === 0) {
-          splitIndex = ptr_diff(commaPtr, messagePtr);
+    emit(from: number, to: number, prepend: number, append: number): void {
+      const bodyLength: number = to - from;
+      const payload: number = bodyLength + (prepend !== NO_BYTE ? 1 : 0) +
+        (append !== NO_BYTE ? 1 : 0);
+      const total: number = HEADER_SIZE + payload;
+      const out: c_ptr = this.out;
+      const body: c_ptr = this.body;
+
+      set_byte(out, 0, payload & 255);
+      set_byte(out, 1, (payload >> 8) & 255);
+      set_byte(out, 2, (payload >> 16) & 255);
+      set_byte(out, 3, (payload >> 24) & 255);
+
+      let cursor: number = HEADER_SIZE;
+      if (prepend !== NO_BYTE) {
+        set_byte(out, cursor, prepend);
+        cursor++;
+      }
+      /*
+      let src: number = from;
+      for (let i: number = 0; i < bodyLength; i++) {
+        set_byte(out, cursor, get_byte(body, src));
+        cursor++;
+        src++;
+      }
+      */
+      // mem
+      copy_bytes(out, cursor, body, from, bodyLength);
+      cursor = cursor + bodyLength;
+      if (append !== NO_BYTE) {
+        set_byte(out, cursor, append);
+        cursor++;
+      }
+
+      this.writeBuffer(STDOUT_FD, out, total);
+    }
+
+    sendChunk(fromIndex: number, toIndex: number): void {
+      const body: c_ptr = this.body;
+      const startByte: number = get_byte(body, fromIndex);
+      const endByte: number = get_byte(body, toIndex - 1);
+
+      let actualFrom: number = fromIndex;
+      let prepend: number = NO_BYTE;
+      let append: number = NO_BYTE;
+
+      if (startByte === OPEN_BRACKET && endByte !== CLOSE_BRACKET) {
+        append = CLOSE_BRACKET;
+      } else if (startByte === COMMA) {
+        actualFrom = fromIndex + 1;
+        prepend = OPEN_BRACKET;
+        if (endByte !== CLOSE_BRACKET) {
+          append = CLOSE_BRACKET;
         }
       }
+      this.emit(actualFrom, toIndex, prepend, append);
+    }
 
-      let chunkStartPtr = ptr_add(messagePtr, index);
-      let chunkLen = splitIndex - index;
+    streamIncomingMessage(totalIncomingBytes: number): void {
+      let remainingBytes: number = totalIncomingBytes;
+      let bufferPopulation: number = 0;
+      const body: c_ptr = this.body;
 
-      let firstChar = get_byte(chunkStartPtr, 0);
-      let lastChar = get_byte(chunkStartPtr, chunkLen - 1);
+      while (remainingBytes > 0 || bufferPopulation > 0) {
+        const spaceAvailable: number = STREAM_BUFFER_SIZE - bufferPopulation;
+        const amountToRead: number = spaceAvailable < remainingBytes
+          ? spaceAvailable
+          : remainingBytes;
 
-      let bodyPtr = chunkStartPtr;
-      let bodyLen = chunkLen;
-      let prependChar = 0;
-      let appendChar = 0;
+        if (amountToRead > 0) {
+          this.readExactBody(bufferPopulation, amountToRead);
+          bufferPopulation = bufferPopulation + amountToRead;
+          remainingBytes = remainingBytes - amountToRead;
+        }
 
-      if (firstChar === 91) {
-        if (lastChar !== 93) appendChar = 93;
-      } else if (firstChar === 44) {
-        prependChar = 91;
-        bodyPtr = ptr_add(bodyPtr, 1);
-        bodyLen--;
-        if (lastChar !== 93) appendChar = 93;
+        if (bufferPopulation <= CHUNK_SIZE) {
+          if (remainingBytes === 0) {
+            if (bufferPopulation > 0) {
+              this.sendChunk(0, bufferPopulation);
+              bufferPopulation = 0;
+            }
+            break;
+          }
+          continue;
+        }
+
+
+        const chunkBacktrack: number = CHUNK_SIZE - 8;
+        const searchStart: number = chunkBacktrack < bufferPopulation
+          ? chunkBacktrack
+          : 0;
+        const foundComma: number = index_of(
+          body,
+          searchStart,
+          bufferPopulation,
+          COMMA,
+        );
+
+        const splitIndex: number = foundComma !== -1 ? foundComma : CHUNK_SIZE;
+
+        this.sendChunk(0, splitIndex);
+
+        const remainingInWindow: number = bufferPopulation - splitIndex;
+        move_bytes(body, 0, body, splitIndex, remainingInWindow);
+        bufferPopulation = remainingInWindow;
+      }
+    }
+
+    writeStringToUtilBuffer(str: string): number {
+      const s: any = str;
+      const len: number = s.length as number;
+      const u: c_ptr = this.util;
+      for (let i: number = 0; i < len; i++) {
+        const cp: number = s.charCodeAt(i) as number;
+        set_byte(u, i, cp);
+      }
+      return len;
+    }
+
+    writeManualErrorJson(msg: string): number {
+      const u: c_ptr = this.util;
+      let cursor: number = 0;
+      set_byte(u, cursor++, 123); // {
+      set_byte(u, cursor++, 34); // "
+      set_byte(u, cursor++, 101); // e
+      set_byte(u, cursor++, 114); // r
+      set_byte(u, cursor++, 114); // r
+      set_byte(u, cursor++, 111); // o
+      set_byte(u, cursor++, 114); // r
+      set_byte(u, cursor++, 34); // "
+      set_byte(u, cursor++, 58); // :
+      set_byte(u, cursor++, 34); // "
+
+      const m: any = msg;
+      const msgLen: number = m.length as number;
+      for (let i: number = 0; i < msgLen; i++) {
+        const cp: number = m.charCodeAt(i) as number;
+        if (cp === 34 || cp === 92) {
+          set_byte(u, cursor++, 92);
+        }
+        set_byte(u, cursor++, cp);
       }
 
-      let totalChunkLen = bodyLen + (prependChar ? 1 : 0) +
-        (appendChar ? 1 : 0);
-      write_uint32_le(headerBuf, totalChunkLen);
+      set_byte(u, cursor++, 34); // "
+      set_byte(u, cursor++, 125); // }
+      return cursor;
+    }
 
-      c_fwrite(headerBuf, 1, 4, stdoutStream);
-      if (prependChar) c_fputc(prependChar, stdoutStream);
-      c_fwrite(bodyPtr, 1, bodyLen, stdoutStream);
-      if (appendChar) c_fputc(appendChar, stdoutStream);
-      c_fflush(stdoutStream);
+    handleCrash(msg: string): void {
+      const len: number = this.writeManualErrorJson(msg);
+      this.writeBuffer(STDERR_FD, this.util, len);
 
-      index = splitIndex;
+      const body: c_ptr = this.body;
+      const u: c_ptr = this.util;
+      copy_bytes(body, 0, u, 0, len);
+      this.sendChunk(0, len);
+
+      c_exit(1);
+    }
+
+    mainProcessingLoop(): number {
+      const header: c_ptr = this.header;
+      let status: number = 0;
+      while (true) {
+        let bytesRead: number = 0;
+        let filled: number = 0;
+        while (filled < HEADER_SIZE) {
+          const n: number = this.io.read(
+            STDIN_FD,
+            header,
+            filled,
+            HEADER_SIZE - filled,
+          );
+          if (n <= 0) {
+            bytesRead = filled;
+            break;
+          }
+          filled = filled + n;
+          bytesRead = filled;
+        }
+
+        if (bytesRead === 0) {
+          status = 0;
+          break;
+        }
+        if (bytesRead < HEADER_SIZE) {
+          status = 1;
+          break;
+        }
+
+        const totalIncomingBytes: number = this.readLengthFromHeader();
+        this.streamIncomingMessage(totalIncomingBytes);
+      }
+      return status;
     }
   }
 
-  // --- Runtime Infrastructure Execution Loop ---
-  function main(): number {
-    const stdin_stream = get_stdin();
-    const stdout_stream = get_stdout();
+  function run(): void {
+    const pipeline: NativeHostPipeline = new NativeHostPipeline();
+    const initMessage: string = '"Static Hermes Native Messaging streaming host"';
 
-    const headerBuffer = c_malloc(4);
-    const lengthTrackingBuffer = c_malloc(4);
-    if (
-      is_ptr_null(headerBuffer) === 1 || is_ptr_null(lengthTrackingBuffer) === 1
-    ) return 1;
+    const initLen: number = pipeline.writeStringToUtilBuffer(initMessage);
+    pipeline.writeBuffer(STDERR_FD, pipeline.util, initLen);
 
-    while (true) {
-      let messageBuffer = getMessage(
-        stdin_stream,
-        headerBuffer,
-        lengthTrackingBuffer,
-      );
-      if (is_ptr_null(messageBuffer) === 1) break;
-
-      let currentMessageLength = read_uint32_le(lengthTrackingBuffer);
-      sendMessage(
-        messageBuffer,
-        currentMessageLength,
-        stdout_stream,
-        headerBuffer,
-      );
-
-      c_free(messageBuffer);
+    const statusCode: number = pipeline.mainProcessingLoop();
+    if (statusCode === 1) {
+      pipeline.handleCrash("stdin closed mid-header");
     }
-
-    c_free(headerBuffer);
-    c_free(lengthTrackingBuffer);
-    return 0;
   }
 
-  main();
+  run();
 })({});
+
