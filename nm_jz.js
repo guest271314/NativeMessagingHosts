@@ -1,5 +1,6 @@
-//! jz Native Messaging host, synchronous streaming fs I/O (AOT experiment)
-//! guest271314 11-9-2026
+// JZ Native Messaging host
+// guest271314 10-25-2026
+
 import { readSync, writeSync } from "node:fs";
 const STDIN_FD = 0;
 const STDOUT_FD = 1;
@@ -194,7 +195,7 @@ class NativeHostPipeline {
       body[i] = u[i];
     }
     this.sendChunk(0, len);
-    process.exit(1);
+    throw msg;
   }
   mainProcessingLoop() {
     const header = this.header;
@@ -223,7 +224,7 @@ class NativeHostPipeline {
 }
 function run() {
   const pipeline = new NativeHostPipeline;
-  const initMessage = '"jz Native Messaging streaming host"';
+  const initMessage = '"TypeScript Native Messaging streaming host"';
   const initLen = pipeline.writeStringToUtilBuffer(initMessage);
   pipeline.writeBuffer(STDERR_FD, pipeline.util, initLen);
   const statusCode = pipeline.mainProcessingLoop();
@@ -231,3 +232,4 @@ function run() {
     pipeline.handleCrash("stdin closed mid-header");
   }
 }
+run();
