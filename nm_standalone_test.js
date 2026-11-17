@@ -145,5 +145,5 @@ try {
   console.log(e.stack);
   console.trace();
 } finally {
-  subprocess.kill("SIGHUP");
+  subprocess.stdin.close();
 }
